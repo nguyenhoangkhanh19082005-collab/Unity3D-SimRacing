@@ -1,0 +1,13 @@
+{
+  "config/TFT_eSPI_User_Setup.h": "15f9e4714a2a14a0b200b5cabf772b873781611f4b7d6ee803acfa1b19c5d1ee",
+  "ControlBoxS3/Config.h": "2c00a2168d3cd5e7f1751dc9a860947f2cff86c16e04565f4827a1bdbb8f0235",
+  "ControlBoxS3/ControlBoxS3.ino": "bb421c8831bda15cae9058b44273db70e527547cdf9a15142323e5f5d0cf17e2",
+  "ControlBoxS3/RigProtocol.h": "01d32805ee31e4460d552b2aa3d149fab49a1ead803b07c5ad4ac35b9336a9ab",
+  "manhinhcamung.ino": "905bfb1b8c60cc961f3f9cfce63563aa1f03fcc532483146ab256c3baed43170",
+  "README.md": "9ce2284fc5d0cc07d6fe720211358b8ca48ee4e048a3d30e37eb7f01e7d16f11",
+  "tests/protocol_test.cpp": "e5e1d37d30671a459ac08962afa10895bca035923369542b1e4f49fc9b7e3c34",
+  "TouchscreenWroom/Config.h": "8ce57704ba37ea02d81afe7375fc20674879742568e00fc0a41a04c98033a54b",
+  "TouchscreenWroom/RigProtocol.h": "01d32805ee31e4460d552b2aa3d149fab49a1ead803b07c5ad4ac35b9336a9ab",
+  "TouchscreenWroom/TouchscreenWroom.ino": "45ce69e6a72255774f865ee81889ae51eeb961ac1ac951e04f606bd1a17e221c",
+  "VERIFICATION.md": "5203f20b5789dab63e5686cc08f2c401da1690481788bb34af5c9c274ac5f967"
+}

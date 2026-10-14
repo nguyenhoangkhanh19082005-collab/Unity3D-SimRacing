@@ -1,0 +1,12 @@
+* text=auto
+"Assets/SimRacing/Imported/Meshes/mesh_00130.asset" filter=lfs diff=lfs merge=lfs -text
+"Assets/SimRacing/Imported/Meshes/mesh_00131.asset" filter=lfs diff=lfs merge=lfs -text
+"Assets/SimRacing/Imported/Meshes/mesh_00132.asset" filter=lfs diff=lfs merge=lfs -text
+"Assets/SimRacing/Imported/Meshes/mesh_00133.asset" filter=lfs diff=lfs merge=lfs -text
+"Assets/SimRacing/Imported/Meshes/mesh_00134.asset" filter=lfs diff=lfs merge=lfs -text
+"Assets/SimRacing/Imported/Meshes/mesh_00230.asset" filter=lfs diff=lfs merge=lfs -text
+"Assets/SourceData/Meshes/mesh_00130.bytes" filter=lfs diff=lfs merge=lfs -text
+"Assets/SourceData/Meshes/mesh_00131.bytes" filter=lfs diff=lfs merge=lfs -text
+"Assets/SourceData/Meshes/mesh_00132.bytes" filter=lfs diff=lfs merge=lfs -text
+"Assets/SourceData/Meshes/mesh_00133.bytes" filter=lfs diff=lfs merge=lfs -text
+"Assets/SourceData/Meshes/mesh_00134.bytes" filter=lfs diff=lfs merge=lfs -text
