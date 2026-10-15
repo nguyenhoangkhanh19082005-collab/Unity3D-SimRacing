@@ -61,11 +61,37 @@ namespace SimRacing
             Vector3 rawAcceleration=transform.InverseTransformDirection((Body.linearVelocity-previousVelocity)/dt);
             Acceleration=Vector3.Lerp(Acceleration,Vector3.ClampMagnitude(rawAcceleration,18),1-Mathf.Exp(-8*dt));
             previousVelocity=Body.linearVelocity;
-            bool holding=Locked || Wrecked || !rig || rig.Held || !rig.Connected;
-            if(holding)input=RigSample.Held;
-            Gear=input.gear;
-            if(!input.ignition || Fuel<=0 || Wrecked || holding)EngineRunning=false;
-            else if(input.starter)EngineRunning=true;
+            bool keyboardDriving = (!rig || !rig.Connected) &&
+                (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow) ||
+                 Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow) ||
+                 Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow) ||
+                 Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow) ||
+                 Input.GetKey(KeyCode.Space));
+            bool holding = Locked || Wrecked || (!keyboardDriving && (!rig || rig.Held || !rig.Connected));
+            if (keyboardDriving)
+            {
+                float gas = (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) ? 1f : 0f;
+                float brk = (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) ? (forwardSpeed > 1f ? 1f : 0f) : (Input.GetKey(KeyCode.Space) ? 1f : 0f);
+                float str = 0f;
+                if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) str -= 1f;
+                if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) str += 1f;
+                int g = (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) && forwardSpeed <= 1f ? 6 : 1;
+                input = new RigSample
+                {
+                    ignition = true,
+                    starter = true,
+                    throttle = gas,
+                    brake = brk,
+                    steer = str,
+                    clutch = 0f,
+                    gear = g
+                };
+                EngineRunning = true;
+            }
+            else if (holding) input = RigSample.Held;
+            Gear = input.gear;
+            if (!keyboardDriving && (!input.ignition || Fuel <= 0 || Wrecked || holding)) EngineRunning = false;
+            else if (input.starter) EngineRunning = true;
             float ratio=definition.ratios[Mathf.Clamp(Gear,0,definition.ratios.Length-1)];
             float engagement=1-input.clutch;
             float shaft=Mathf.Abs(forwardSpeed)/(2*Mathf.PI*definition.tireRadius)*60*Mathf.Abs(ratio)*definition.finalDrive;
@@ -151,7 +177,7 @@ namespace SimRacing
         public void SetCockpit(bool active)
         {
             if(definition.cockpit)definition.cockpit.gameObject.SetActive(active);
-            if(definition.exterior)definition.exterior.gameObject.SetActive(!active);
+            if(definition.exterior)definition.exterior.gameObject.SetActive(true);
             foreach(var visual in definition.wheelVisuals)visual.gameObject.SetActive(!active);
         }
     }

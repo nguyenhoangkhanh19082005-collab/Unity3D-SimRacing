@@ -16,3 +16,11 @@
 *.zip
 *.user
 *.suo
+
+/bin/
+/obj/
+/scratch/
+/.agents/
+/docs/
+*.py
+*.ps1

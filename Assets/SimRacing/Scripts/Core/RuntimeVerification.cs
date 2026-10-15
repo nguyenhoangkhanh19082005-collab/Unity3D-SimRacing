@@ -19,7 +19,7 @@ namespace SimRacing
             put(0,0x5349);put(2,2);put(4,(int)timestamp);put(6,(int)(timestamp>>16));put(8,steering);put(10,steering>>16);
             put(12,gas);put(14,brake);put(16,clutch);b[18]=(byte)gear;put(19,flags);put(21,2048);put(23,2048);return b;
         }
-        void Check(bool yes,string label){checks++;if(!yes){errors++;Debug.LogError("[RUNTIME FAIL] "+label);}else Debug.Log("[RUNTIME PASS] "+label);}
+        void Check(bool yes,string label){checks++;string dir=directory??Path.Combine(Application.dataPath,"..","Verification");string line=(yes?"[PASS] ":"[FAIL] ")+label;if(!yes){errors++;Debug.LogError(line);}else{Debug.Log(line);}try{File.AppendAllText(Path.Combine(dir,"test-log.txt"),line+"\n");}catch{}}
         void Update(){if(sending && sender!=null){var b=Packet(++stamp,encoder,throttle,brake,clutch,gear,flags);sender.Send(b,b.Length);}if(app && app.ScreenState=="drive")frameTimes.Add(Time.unscaledDeltaTime*1000);}
         IEnumerator Start()
         {
@@ -58,8 +58,56 @@ namespace SimRacing
             Check(app.Car.Recover(false),"stationary recovery");Check(app.Car.Recoveries==1 && app.Rig.Held,"recovery invalidates attempt and holds rig");
             sending=false;sender.Close();sender=null;
             app.Mode="race";app.CarId="ferrari";app.TrackId="mountain";yield return app.LoadDrive();yield return new WaitForSecondsRealtime(3);
-            Check(app.Car.Grounded && app.Car.Health>99,"Ferrari mountain spawn");app.CameraRig.Mode=1;yield return new WaitForSecondsRealtime(1);yield return Capture("06-mountain-ferrari.png");
-            app.CarId="bugatti";app.TrackId="coastal";yield return app.LoadDrive();yield return new WaitForSecondsRealtime(3);Check(app.Car.Grounded && app.Car.Health>99,"Bugatti coastal spawn");app.CameraRig.Mode=1;yield return new WaitForSecondsRealtime(1);yield return Capture("07-bugatti.png");
+            Check(app.Car.Grounded && app.Car.Health>99,"Ferrari mountain spawn");app.Car.Body.position+=app.Car.transform.forward*15f;app.CameraRig.Mode=1;yield return new WaitForSecondsRealtime(1);yield return Capture("06-mountain-ferrari.png");
+            app.CarId="bugatti";app.TrackId="coastal";yield return app.LoadDrive();yield return new WaitForSecondsRealtime(3);Check(app.Car.Grounded && app.Car.Health>99,"Bugatti coastal spawn");
+            app.Car.Body.position+=app.Car.transform.forward*15f;
+            
+            // 1. Third-person chase camera (Mode 1)
+            app.CameraRig.Mode=1;yield return new WaitForSecondsRealtime(1);
+            yield return Capture("07-bugatti.png");
+            yield return Capture("bugatti-01-chase-rear.png");
+
+            // 2. First-person cockpit camera (Mode 0) forward view
+            app.CameraRig.Mode=0;yield return new WaitForSecondsRealtime(1);
+            yield return Capture("07b-bugatti-cockpit.png");
+            yield return Capture("bugatti-02-cockpit-fpv.png");
+
+            // 3. First-person cockpit camera (Mode 0) looking right towards passenger side & door
+            var camObj = Camera.main ?? app.CameraRig.GetComponentInChildren<Camera>();
+            Quaternion savedCamRot = camObj.transform.localRotation;
+            camObj.transform.localRotation *= Quaternion.Euler(0, 32f, 0);
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Capture("bugatti-03-cockpit-look-right.png");
+            camObj.transform.localRotation = savedCamRot;
+
+            // 4. Third-person front 3/4 angle
+            app.CameraRig.enabled = false;
+            var carTf = app.Car.transform;
+            camObj.transform.position = carTf.position + carTf.forward * 6.5f + carTf.right * 3.8f + Vector3.up * 1.4f;
+            camObj.transform.LookAt(carTf.position + Vector3.up * 0.7f);
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Capture("bugatti-04-exterior-front.png");
+
+            // 5. Third-person side profile
+            camObj.transform.position = carTf.position + carTf.right * 6.2f + Vector3.up * 1.1f;
+            camObj.transform.LookAt(carTf.position + Vector3.up * 0.6f);
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Capture("bugatti-05-exterior-side.png");
+
+            // 6. Action drive shot (Third-person chase cam while cruising)
+            app.CameraRig.enabled = true;
+            app.CameraRig.Mode = 1;
+            app.Car.Body.linearVelocity = carTf.forward * 22f; // ~80 km/h
+            yield return new WaitForSecondsRealtime(1);
+            yield return Capture("bugatti-06-driving-action.png");
+
+            // 7. Action cockpit drive shot (First-person FPV while cruising)
+            app.CameraRig.Mode = 0;
+            app.Car.Body.linearVelocity = carTf.forward * 24f; // ~86 km/h
+            yield return new WaitForSecondsRealtime(1);
+            yield return Capture("bugatti-07-driving-cockpit.png");
+            app.Car.Body.linearVelocity = Vector3.zero;
+            app.CameraRig.Mode = 1;
             yield return CareerAndSaves();
             yield return FuelAndImpact();
             frameTimes.Sort();float median=frameTimes.Count>0?frameTimes[frameTimes.Count/2]:0,p95=frameTimes.Count>0?frameTimes[(int)(frameTimes.Count*.95f)]:0;
