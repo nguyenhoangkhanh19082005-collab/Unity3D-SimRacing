@@ -71,7 +71,10 @@ namespace SimRacing
 
             string[] candidates = new[]
             {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", rel),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, rel),
                 Path.Combine(Application.dataPath, rel),
+                Path.Combine(Application.dataPath, "Assets", rel),
                 Path.Combine(Application.dataPath, "..", "Assets", rel),
                 Path.Combine(Application.dataPath, "..", "..", "Assets", rel),
                 Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "Assets", rel)),
@@ -641,7 +644,10 @@ namespace SimRacing
             string rel = "Imported/3d-model.obj";
             string[] candidates = new[]
             {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", rel),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, rel),
                 Path.Combine(Application.dataPath, rel),
+                Path.Combine(Application.dataPath, "Assets", rel),
                 Path.Combine(Application.dataPath, "..", "Assets", rel),
                 Path.Combine(Application.dataPath, "..", "..", "Assets", rel),
                 Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "Assets", rel)),
