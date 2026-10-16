@@ -102,8 +102,8 @@ namespace SimRacing
 
             Panel(22, 584, 320, 91);
             Label(38, 594, 290, 25, $"XĂNG {car.Fuel:0} L   ·   XE {car.Health:0}%", body);
-            Label(38, 627, 288, 38, car.Refueling ? "ĐANG TIẾP NHIÊN LIỆU" : car.EngineRunning ? "ĐỘNG CƠ ĐANG CHẠY" : "ĐỀ MÁY TỪ RIG", small);
-            Label(375, 678, 870, 30, "F1–F2 / V: góc nhìn     F9: mở khóa rig     Backspace: cứu hộ khi dừng     Esc: tạm dừng", small);
+            Label(38, 627, 288, 38, car.Refueling ? "ĐANG TIẾP NHIÊN LIỆU" : car.EngineRunning ? "ĐỘNG CƠ ĐANG CHẠY" : app.Rig.Connected ? "ĐỀ MÁY TỪ RIG" : "CHẾ ĐỘ BÀN PHÍM", small);
+            Label(375, 678, 870, 30, "W/A/S/D: Lái xe     F1–F2 / V: Góc nhìn     Space: Phanh tay     Backspace: Cứu hộ     Esc: Tạm dừng", small);
 
             if (session.Notice != "")
             {

@@ -161,7 +161,19 @@ namespace SimRacing
         {
             if (ScreenState == "drive" && Car && !Session.Active && !Session.Finished)
             {
-                if (!Rig.Held && Rig.Connected) Countdown -= Time.deltaTime;
+                if (!Rig.Connected)
+                {
+                    if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
+                    {
+                        Countdown = 0f;
+                    }
+                    Countdown -= Time.deltaTime;
+                }
+                else if (!Rig.Held && Rig.Connected)
+                {
+                    Countdown -= Time.deltaTime;
+                }
+
                 if (Countdown <= 0) { Car.Locked = false; Session.Begin(); }
             }
             if (Input.GetKeyDown(KeyCode.Escape))

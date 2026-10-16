@@ -61,36 +61,72 @@ namespace SimRacing
             Vector3 rawAcceleration=transform.InverseTransformDirection((Body.linearVelocity-previousVelocity)/dt);
             Acceleration=Vector3.Lerp(Acceleration,Vector3.ClampMagnitude(rawAcceleration,18),1-Mathf.Exp(-8*dt));
             previousVelocity=Body.linearVelocity;
-            bool keyboardDriving = (!rig || !rig.Connected) &&
-                (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow) ||
-                 Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow) ||
-                 Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow) ||
-                 Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow) ||
-                 Input.GetKey(KeyCode.Space));
-            bool holding = Locked || Wrecked || (!keyboardDriving && (!rig || rig.Held || !rig.Connected));
-            if (keyboardDriving)
+            bool isKeyboardMode = (!rig || !rig.Connected);
+            bool holding = Locked || Wrecked || (!isKeyboardMode && (rig.Held || !rig.Connected));
+            if (isKeyboardMode)
             {
-                float gas = (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) ? 1f : 0f;
-                float brk = (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) ? (forwardSpeed > 1f ? 1f : 0f) : (Input.GetKey(KeyCode.Space) ? 1f : 0f);
-                float str = 0f;
-                if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) str -= 1f;
-                if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) str += 1f;
-                int g = (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) && forwardSpeed <= 1f ? 6 : 1;
-                input = new RigSample
+                if (Locked || Wrecked)
                 {
-                    ignition = true,
-                    starter = true,
-                    throttle = gas,
-                    brake = brk,
-                    steer = str,
-                    clutch = 0f,
-                    gear = g
-                };
-                EngineRunning = true;
+                    input = RigSample.Held;
+                }
+                else
+                {
+                    float gas = (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) ? 1f : 0f;
+                    float brk = 0f;
+                    int g = 1;
+
+                    if (Input.GetKey(KeyCode.Space))
+                    {
+                        brk = 1f;
+                    }
+                    else if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow))
+                    {
+                        if (forwardSpeed > 1.2f)
+                        {
+                            brk = 1f;
+                            gas = 0f;
+                        }
+                        else
+                        {
+                            // Reverse gear
+                            g = 6;
+                            gas = 0.85f;
+                            brk = 0f;
+                        }
+                    }
+
+                    // Automatic transmission: select gear 1-5 based on road speed
+                    if (g != 6)
+                    {
+                        if (Speed < 45f) g = 1;
+                        else if (Speed < 85f) g = 2;
+                        else if (Speed < 135f) g = 3;
+                        else if (Speed < 190f) g = 4;
+                        else g = 5;
+                        if (definition.ratios != null && g >= definition.ratios.Length)
+                            g = Mathf.Max(1, definition.ratios.Length - 1);
+                    }
+
+                    float str = 0f;
+                    if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) str -= 1f;
+                    if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) str += 1f;
+
+                    input = new RigSample
+                    {
+                        ignition = true,
+                        starter = true,
+                        throttle = gas,
+                        brake = brk,
+                        steer = str,
+                        clutch = 0f,
+                        gear = g
+                    };
+                    EngineRunning = true;
+                }
             }
             else if (holding) input = RigSample.Held;
             Gear = input.gear;
-            if (!keyboardDriving && (!input.ignition || Fuel <= 0 || Wrecked || holding)) EngineRunning = false;
+            if (!isKeyboardMode && (!input.ignition || Fuel <= 0 || Wrecked || holding)) EngineRunning = false;
             else if (input.starter) EngineRunning = true;
             float ratio=definition.ratios[Mathf.Clamp(Gear,0,definition.ratios.Length-1)];
             float engagement=1-input.clutch;

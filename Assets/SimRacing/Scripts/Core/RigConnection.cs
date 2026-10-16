@@ -85,7 +85,9 @@ namespace SimRacing
             try { socket.Send(b, b.Length, remote); } catch (SocketException) { Held = true; }
         }
         public string Status => !string.IsNullOrEmpty(Error) ? Error : !Connected
-            ? "CHỜ RIG • Giữ phanh • Kiểm tra Ethernet và cổng " + Port
+            ? (SimulationApp.Instance && SimulationApp.Instance.Session && SimulationApp.Instance.Session.Active
+                ? ""
+                : "CHẾ ĐỘ BÀN PHÍM • W: Ga  |  S: Phanh/Lùi  |  A/D: Đánh lái  |  Space: Phanh tay")
             : Raw.gearFault ? "LỖI CẦN SỐ • Về N, nhả ga, giữ phanh rồi F9"
             : Held ? "RIG TẠM KHÓA • Về N, nhả ga, giữ phanh rồi F9" : "";
         void OnDestroy() { Hold(); SendFeedback(0,0,0,0,0,false,false,0); socket?.Close(); }
