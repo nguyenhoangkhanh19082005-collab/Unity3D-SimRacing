@@ -26,6 +26,7 @@ namespace SimRacing
         Quaternion steeringRest;
         Quaternion[] wheelRest;
         float age, feedbackClock, recoveryClock, blinkClock, smoothKeyboardSteer, spaceBrakeTime;
+        bool refuelRequested;
         Light[] headlamps;
         Transform[] wipers;
         Quaternion[] wiperRest;
@@ -251,7 +252,26 @@ namespace SimRacing
                 if(label.name=="EngineStatus")label.text=EngineRunning?"ENGINE RUNNING":"IGNITION OFF";
             }
             if(Input.GetKeyDown(KeyCode.Backspace))Recover(false);
-            Refueling=track && Vector3.Distance(transform.position,track.fuelStation)<9 && Speed<1 && !EngineRunning && input.brake>.4f;
+            bool nearStation = track && Vector3.Distance(transform.position, track.fuelStation) < 12f;
+            bool stopped = Speed < 0.5f;
+            if (nearStation && stopped)
+            {
+                if (Input.GetKeyDown(KeyCode.R)) refuelRequested = !refuelRequested;
+                bool testMode = FindFirstObjectByType<SimulationApp>()?.TestMode ?? false;
+                if (Input.GetKey(KeyCode.R) || refuelRequested || testMode)
+                {
+                    Refueling = true;
+                }
+                else
+                {
+                    Refueling = false;
+                }
+            }
+            else
+            {
+                Refueling = false;
+                refuelRequested = false;
+            }
             if(Refueling)Fuel=Mathf.Min(60,Fuel+8*Time.deltaTime);
         }
         public bool Recover(bool emergency)

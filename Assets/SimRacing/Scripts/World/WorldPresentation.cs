@@ -24,7 +24,7 @@ namespace SimRacing
             var vignette=volume.profile.Add<Vignette>(true);vignette.intensity.value=.15f;vignette.smoothness.value=.65f;
             var skyShader=Shader.Find("SimRacing/Atmosphere");if(skyShader){sky=new Material(skyShader);RenderSettings.skybox=sky;}
             RenderSettings.sun=sun;RenderSettings.ambientMode=AmbientMode.Trilight;
-            QualitySettings.shadowDistance=95;QualitySettings.shadowCascades=2;QualitySettings.vSyncCount=0;Application.targetFrameRate=60;
+            QualitySettings.shadowDistance=95;QualitySettings.shadowCascades=2;QualitySettings.vSyncCount=0;Application.targetFrameRate=120;
             reflection=new GameObject("Sky reflection").AddComponent<ReflectionProbe>();reflection.transform.SetParent(transform);reflection.mode=ReflectionProbeMode.Realtime;reflection.refreshMode=ReflectionProbeRefreshMode.ViaScripting;reflection.resolution=128;reflection.cullingMask=0;reflection.size=Vector3.one*10000;
             CreateRain();SetWeather(Weather);
         }
@@ -32,6 +32,12 @@ namespace SimRacing
         {
             Weather=weather;bool night=weather=="night",wet=weather=="rain",fog=weather=="fog";
             sun.intensity=night?.16f:wet?.6f:fog?.8f:1.8f;sun.color=night?new Color(.5f,.65f,1):new Color(1,.93f,.82f);
+            var track = FindFirstObjectByType<TrackDefinition>();
+            if (track != null)
+            {
+                foreach (var l in track.GetComponentsInChildren<Light>(true))
+                    if (l.type == LightType.Spot) l.enabled = night;
+            }
             RenderSettings.ambientSkyColor=night?new Color(.04f,.06f,.105f):wet?new Color(.3f,.36f,.43f):new Color(.48f,.62f,.8f);
             RenderSettings.ambientEquatorColor=night?new Color(.03f,.035f,.055f):new Color(.35f,.38f,.4f);
             RenderSettings.ambientGroundColor=night?new Color(.018f,.022f,.025f):new Color(.16f,.17f,.16f);

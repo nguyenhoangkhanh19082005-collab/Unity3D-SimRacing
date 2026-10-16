@@ -62,6 +62,7 @@ namespace SimRacing
         /// </summary>
         void OnGUI()
         {
+            if (Event.current.type != EventType.Repaint && Event.current.type != EventType.Layout) return;
             if (app != null && app.ScreenState == "drive")
             {
                 Styles();
@@ -111,9 +112,14 @@ namespace SimRacing
                 Label(319, 184, 644, 38, session.Notice, body);
             }
 
-            if (car.Refueling || (Vector3.Distance(car.transform.position, app.Track.fuelStation) < 15 && !car.Refueling))
+            if (car.Refueling || (Vector3.Distance(car.transform.position, app.Track.fuelStation) < 15))
             {
-                Label(385, 620, 550, 45, car.Refueling ? "Đang đổ xăng…" : "Dừng tại trạm, tắt máy và giữ phanh để đổ xăng", body);
+                string fuelMsg = car.Refueling 
+                    ? "Đang nạp lại xăng… (Nhấn R để dừng)" 
+                    : car.Speed < 0.5f 
+                        ? "Dừng xe và nhấn R để nạp lại xăng" 
+                        : "Dừng xe về 0 km/h và nhấn R để nạp lại xăng";
+                Label(385, 620, 550, 45, fuelMsg, body);
             }
 
             MiniMap();
@@ -127,9 +133,11 @@ namespace SimRacing
             float scale = .065f;
             Color old = GUI.color;
             GUI.color = Muted;
-            foreach (var point in app.Track.route)
+            var route = app.Track.route;
+            int step = route.Length > 100 ? 2 : 1;
+            for (int i = 0; i < route.Length; i += step)
             {
-                Vector3 d = point - app.Car.transform.position;
+                Vector3 d = route[i] - app.Car.transform.position;
                 float x = Mathf.Clamp(d.x * scale, -76, 76), y = Mathf.Clamp(-d.z * scale, -76, 76);
                 GUI.DrawTexture(new Rect(center.x + x, center.y + y, 2, 2), Texture2D.whiteTexture);
             }

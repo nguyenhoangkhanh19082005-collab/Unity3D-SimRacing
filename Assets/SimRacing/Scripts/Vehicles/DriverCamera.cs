@@ -24,7 +24,7 @@ namespace SimRacing
             view.farClipPlane = 1800;
             var data = view.GetUniversalAdditionalCameraData();
             data.renderPostProcessing = true;
-            data.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+            data.antialiasing = AntialiasingMode.FastApproximateAntialiasing;
 
             var rear = new GameObject("Rear view camera");
             rear.transform.SetParent(transform.parent);
@@ -48,7 +48,7 @@ namespace SimRacing
         void LateUpdate()
         {
             if (!car) return;
-            if (car.definition.mirror && car.definition.mirror.sharedMaterial.mainTexture != MirrorTexture)
+            if (car.definition.mirror && (car.definition.mirror.sharedMaterial == null || car.definition.mirror.sharedMaterial.mainTexture != MirrorTexture))
             {
                 var material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
                 material.mainTexture = MirrorTexture;
@@ -101,25 +101,31 @@ namespace SimRacing
                 var position = snap ? desired : Vector3.SmoothDamp(transform.position, desired, ref chaseVelocity, .16f, 200, dt);
                 var pivot = t.position + Vector3.up;
                 var delta = position - pivot;
-                foreach (var hit in Physics.SphereCastAll(pivot, .18f, delta.normalized, delta.magnitude, ~(1 << 8), QueryTriggerInteraction.Ignore))
+                var hits = Physics.SphereCastAll(pivot, .18f, delta.normalized, delta.magnitude, ~(1 << 8), QueryTriggerInteraction.Ignore);
+                for (int i = 0; i < hits.Length; i++)
+                {
+                    var hit = hits[i];
                     if (!hit.transform.IsChildOf(t) && hit.distance < delta.magnitude)
                     {
                         position = pivot + delta.normalized * Mathf.Max(.4f, hit.distance - .2f);
                         delta = position - pivot;
                     }
+                }
                 transform.position = position;
                 transform.LookAt(t.position + t.forward * 3.5f + Vector3.up * .95f);
                 view.fieldOfView = Mathf.Lerp(view.fieldOfView, 65 + factor * 8, 1 - Mathf.Exp(-5 * dt));
             }
 
-            mirror.transform.SetPositionAndRotation(t.position + Vector3.up * 1.2f - t.forward * 2.7f, Quaternion.LookRotation(-t.forward, t.up));
-
-            // Smooth 60Hz rearview mirror update
-            mirrorClock += dt;
-            if (mirrorClock >= 1f / 60)
+            // Only update rearview mirror when in cockpit view (Mode == 0) to avoid rendering the entire scene twice in chase view
+            if (Mode == 0)
             {
-                mirrorClock = 0;
-                mirror.Render();
+                mirror.transform.SetPositionAndRotation(t.position + Vector3.up * 1.2f - t.forward * 2.7f, Quaternion.LookRotation(-t.forward, t.up));
+                mirrorClock += dt;
+                if (mirrorClock >= 1f / 30f)
+                {
+                    mirrorClock = 0;
+                    mirror.Render();
+                }
             }
         }
 

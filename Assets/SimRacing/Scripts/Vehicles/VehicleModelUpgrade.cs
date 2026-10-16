@@ -169,9 +169,19 @@ namespace SimRacing
                 }
                 else if (name.Contains("glass") || name.Contains("window"))
                 {
-                    SetTransparent(m, new Color(0.1f, 0.15f, 0.2f, 0.35f), 0.98f);
+                    SetTransparent(m, new Color(0.15f, 0.22f, 0.26f, 0.40f), 0.95f);
+                    m.SetFloat("_Cull", 0f);
+                    m.doubleSidedGI = true;
                 }
-                else if (name.Contains("brake"))
+                else if (name.Contains("tyre") || name.Contains("tire"))
+                {
+                    SetOpaque(m, new Color(0.12f, 0.12f, 0.13f, 1f), 0.02f, 0.25f, twoSided: true);
+                }
+                else if (name.Contains("rim") || name.Contains("rrim"))
+                {
+                    SetOpaque(m, new Color(0.88f, 0.90f, 0.92f, 1f), 0.88f, 0.86f, twoSided: true);
+                }
+                else if (name.Contains("brake") && !name.Contains("light"))
                 {
                     m.SetColor("_BaseColor", new Color(0.55f, 0.55f, 0.58f, 1f));
                     m.SetFloat("_Metallic", 0.85f);
@@ -185,7 +195,22 @@ namespace SimRacing
                 }
             }
 
-            return ParseObj(path, materials, 1.0f, Quaternion.identity, Vector3.zero);
+            var root = ParseObj(path, materials, 1.0f, Quaternion.identity, Vector3.zero);
+            if (root)
+            {
+                foreach (var r in root.GetComponentsInChildren<Renderer>(true))
+                {
+                    foreach (var mat in r.materials)
+                    {
+                        if (mat)
+                        {
+                            mat.SetFloat("_Cull", 0f);
+                            mat.doubleSidedGI = true;
+                        }
+                    }
+                }
+            }
+            return root;
         }
 
         private static GameObject LoadMercedesW210(string path)
@@ -372,6 +397,8 @@ namespace SimRacing
             m.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
             m.SetFloat("_ZWrite", 0);
             m.SetFloat("_Smoothness", smoothness);
+            m.SetFloat("_Cull", 0f);
+            m.doubleSidedGI = true;
             m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
             m.renderQueue = (int)RenderQueue.Transparent;
         }
@@ -921,7 +948,7 @@ namespace SimRacing
                                      n.StartsWith("cylinder10") || n.StartsWith("box04") || n.StartsWith("box03") ||
                                      n.StartsWith("torus") || n.StartsWith("mirror_dark") || n.StartsWith("plane058") ||
                                      n.StartsWith("cylinder090") ||
-                                     n.StartsWith("meshpart2") || n.StartsWith("meshpart31");
+                                     n == "meshpart2" || n == "meshpart31";
 
                     if (isCockpit)
                     {
