@@ -25,13 +25,14 @@ namespace SimRacing
         Vector3 previousVelocity;
         Quaternion steeringRest;
         Quaternion[] wheelRest;
-        float age, feedbackClock, recoveryClock, blinkClock;
+        float age, feedbackClock, recoveryClock, blinkClock, smoothKeyboardSteer, spaceBrakeTime;
         Light[] headlamps;
         Transform[] wipers;
         Quaternion[] wiperRest;
         TextMesh[] statusLabels;
         public bool Blink => blinkClock % 1 < .5f;
         public RigSample Controls => rig ? rig.Controls : RigSample.Held;
+        public void ResetSteeringRest() { if (definition.steeringWheel) steeringRest = definition.steeringWheel.localRotation; }
         void Awake()
         {
             definition=GetComponent<VehicleDefinition>(); Body=GetComponent<Rigidbody>();
@@ -62,54 +63,107 @@ namespace SimRacing
             Acceleration=Vector3.Lerp(Acceleration,Vector3.ClampMagnitude(rawAcceleration,18),1-Mathf.Exp(-8*dt));
             previousVelocity=Body.linearVelocity;
             bool isKeyboardMode = (!rig || !rig.Connected);
-            bool holding = Locked || Wrecked || (!isKeyboardMode && (rig.Held || !rig.Connected));
+            bool holding = Locked || (!isKeyboardMode && (Wrecked || rig.Held || !rig.Connected));
             if (isKeyboardMode)
             {
-                if (Locked || Wrecked)
+                if (Locked)
                 {
                     input = RigSample.Held;
                 }
                 else
                 {
-                    float gas = (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) ? 1f : 0f;
+                    bool wantForward = Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow);
+                    bool wantReverse = Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow);
+                    bool wantSpace = Input.GetKey(KeyCode.Space);
+
+                    float gas = 0f;
                     float brk = 0f;
                     int g = 1;
 
-                    if (Input.GetKey(KeyCode.Space))
+                    if (wantSpace)
                     {
-                        brk = 1f;
+                        spaceBrakeTime += dt;
+                        // Tapping Space: initial moderate brake (~0.45f) to reduce speed slightly
+                        // Holding Space: progressively ramps up to 1.0f full brake over ~1.2 seconds
+                        float spaceBrake = Mathf.Clamp(0.45f + spaceBrakeTime * 0.75f, 0f, 1f);
+                        brk = spaceBrake;
+                        gas = 0f;
+
+                        // When speed drops below 0.8 km/h and Space is held, bring vehicle to a clean full stop at 0 km/h
+                        if (Speed < 0.8f && spaceBrakeTime > 0.4f)
+                        {
+                            Body.linearVelocity = Vector3.zero;
+                            Body.angularVelocity = Vector3.zero;
+                            brk = 1f;
+                        }
+                        g = (forwardSpeed < -0.5f) ? 6 : (Speed < 45f ? 1 : 2);
                     }
-                    else if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow))
+                    else
                     {
-                        if (forwardSpeed > 1.2f)
+                        spaceBrakeTime = 0f;
+
+                        if (wantForward && !wantReverse)
+                        {
+                            if (forwardSpeed < -0.8f)
+                            {
+                                // Car is rolling backward: apply brakes to stop backward motion first!
+                                brk = 1f;
+                                gas = 0f;
+                                g = 1;
+                            }
+                            else
+                            {
+                                gas = 1f;
+                                brk = 0f;
+                                // Automatic gear selection (1 to 5)
+                                if (Speed < 45f) g = 1;
+                                else if (Speed < 85f) g = 2;
+                                else if (Speed < 135f) g = 3;
+                                else if (Speed < 190f) g = 4;
+                                else g = 5;
+                                if (definition.ratios != null && g >= definition.ratios.Length)
+                                    g = Mathf.Max(1, definition.ratios.Length - 1);
+                            }
+                        }
+                        else if (wantReverse && !wantForward)
+                        {
+                            if (forwardSpeed > 0.8f)
+                            {
+                                // Car is moving forward: apply brakes to stop forward motion first!
+                                brk = 1f;
+                                gas = 0f;
+                                g = (Speed < 45f ? 1 : 2);
+                            }
+                            else
+                            {
+                                // Car stopped or reversing: engage Reverse gear
+                                g = 6;
+                                gas = 0.85f;
+                                brk = 0f;
+                            }
+                        }
+                        else if (wantForward && wantReverse)
                         {
                             brk = 1f;
                             gas = 0f;
+                            g = 1;
                         }
                         else
                         {
-                            // Reverse gear
-                            g = 6;
-                            gas = 0.85f;
+                            // Coasting
+                            gas = 0f;
                             brk = 0f;
+                            g = (forwardSpeed < -0.5f) ? 6 : (Speed < 45f ? 1 : 2);
                         }
                     }
 
-                    // Automatic transmission: select gear 1-5 based on road speed
-                    if (g != 6)
-                    {
-                        if (Speed < 45f) g = 1;
-                        else if (Speed < 85f) g = 2;
-                        else if (Speed < 135f) g = 3;
-                        else if (Speed < 190f) g = 4;
-                        else g = 5;
-                        if (definition.ratios != null && g >= definition.ratios.Length)
-                            g = Mathf.Max(1, definition.ratios.Length - 1);
-                    }
+                    // Smooth speed-sensitive keyboard steering input
+                    float targetStr = 0f;
+                    if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) targetStr -= 1f;
+                    if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) targetStr += 1f;
 
-                    float str = 0f;
-                    if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) str -= 1f;
-                    if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) str += 1f;
+                    float steerRate = (targetStr != 0f) ? (Speed > 100f ? 2.8f : 3.8f) : 6.5f;
+                    smoothKeyboardSteer = Mathf.MoveTowards(smoothKeyboardSteer, targetStr, steerRate * dt);
 
                     input = new RigSample
                     {
@@ -117,7 +171,7 @@ namespace SimRacing
                         starter = true,
                         throttle = gas,
                         brake = brk,
-                        steer = str,
+                        steer = smoothKeyboardSteer,
                         clutch = 0f,
                         gear = g
                     };
@@ -136,7 +190,7 @@ namespace SimRacing
             RPM=Mathf.Min(RPM,definition.redlineRPM);
             if(EngineRunning && !Refueling)Fuel=Mathf.Max(0,Fuel-(.015f+RPM/definition.redlineRPM*.045f*(.3f+input.throttle*.7f))*dt);
             // Braking and a speed-sensitive steering rack are independent of the render frame rate.
-            Steering=Mathf.MoveTowards(Steering,input.steer*Mathf.Lerp(31.5f,7,Mathf.Clamp01(Speed/220)),(Speed>70?110:180)*dt);
+            Steering=Mathf.MoveTowards(Steering,input.steer*Mathf.Lerp(32f,13f,Mathf.Clamp01(Speed/200f)),(Speed>70?110:180)*dt);
             int driven=Mathf.Max(1,definition.drivenWheels.Count(x=>x));Grounded=false;
             if(track) { int nearest=track.Closest(transform.position);Offroad=Vector3.Distance(transform.position,track.Point(nearest))>track.roadHalfWidth+1; }
             float grip=Grip*(Offroad?.65f:1);
@@ -156,6 +210,18 @@ namespace SimRacing
             }
             if(Grounded && transform.up.y>.5f)Body.AddForce(-transform.up*forwardSpeed*forwardSpeed*1.65f);
             Body.AddForce(-Body.linearVelocity*Body.linearVelocity.magnitude*.38f);
+            if (isKeyboardMode && Grounded)
+            {
+                float latVel = Vector3.Dot(Body.linearVelocity, transform.right);
+                // Counter-lateral sliding force on asphalt: gives planted grip when cornering
+                Body.AddForce(-transform.right * latVel * Body.mass * 0.90f * (Offroad ? 0.35f : 1.0f));
+
+                // Stabilizing yaw damping: prevents sudden snap oversteer / spin-out when holding A/D through curves
+                float yaw = Body.angularVelocity.y;
+                float intendedYaw = (Steering * Mathf.Deg2Rad) * (forwardSpeed / 2.8f);
+                float yawDelta = yaw - intendedYaw;
+                Body.AddTorque(transform.up * (-yawDelta * Body.mass * 1.25f));
+            }
             if(holding && Speed<.35f && Grounded) {Body.linearVelocity=Vector3.zero;Body.angularVelocity=Vector3.zero;}
             if(transform.position.y < -30)Recover(true);
             feedbackClock+=dt;
@@ -173,7 +239,7 @@ namespace SimRacing
                 definition.wheels[i].GetWorldPose(out Vector3 p,out Quaternion q);
                 definition.wheelVisuals[i].SetPositionAndRotation(p,q*wheelRest[i]);
             }
-            if(definition.steeringWheel)definition.steeringWheel.localRotation=steeringRest*Quaternion.Euler(0,0,Steering*4.2f);
+            if(definition.steeringWheel)definition.steeringWheel.localRotation=steeringRest*Quaternion.Euler(0,0,-Steering*4.2f);
             if(definition.speedNeedle)definition.speedNeedle.localRotation=Quaternion.Euler(0,0,-130+Mathf.Clamp01(Speed/260)*260);
             if(definition.rpmNeedle)definition.rpmNeedle.localRotation=Quaternion.Euler(0,0,-130+Mathf.Clamp01(RPM/8000)*260);
             if(definition.digitalSpeed)definition.digitalSpeed.text=Mathf.FloorToInt(Speed).ToString();
@@ -184,7 +250,7 @@ namespace SimRacing
                 if(label.name=="FuelDisplay")label.text=$"FUEL  {Fuel:0} L";
                 if(label.name=="EngineStatus")label.text=EngineRunning?"ENGINE RUNNING":"IGNITION OFF";
             }
-            if(Input.GetKeyDown(KeyCode.Backspace) || ((Wrecked || Fuel<=0) && Input.GetKeyDown(KeyCode.Space)))Recover(false);
+            if(Input.GetKeyDown(KeyCode.Backspace))Recover(false);
             Refueling=track && Vector3.Distance(transform.position,track.fuelStation)<9 && Speed<1 && !EngineRunning && input.brake>.4f;
             if(Refueling)Fuel=Mathf.Min(60,Fuel+8*Time.deltaTime);
         }
@@ -200,14 +266,17 @@ namespace SimRacing
         void OnCollisionEnter(Collision contact)
         {
             float damage=0;
+            bool isTraffic = contact.gameObject.GetComponentInParent<TrafficAgent>() != null;
             foreach(var point in contact.contacts) {
                 bool road=point.normal.y>.6f; if(road && age<3)continue;
                 float closing=Mathf.Abs(Vector3.Dot(contact.relativeVelocity,point.normal));
                 float threshold=road?(transform.up.y>.5f?6:3.5f):1.5f;
                 float amount=Mathf.Pow(Mathf.Max(0,closing-threshold),2)*(road?.65f:.18f);
                 if(contact.rigidbody && contact.rigidbody.mass<Body.mass)amount*=Mathf.Clamp(contact.rigidbody.mass/(Body.mass+contact.rigidbody.mass),.03f,1);
+                if(isTraffic)amount*=0.10f;
                 damage=Mathf.Max(damage,amount);
             }
+            damage=Mathf.Min(damage,25f);
             Health=Mathf.Max(0,Health-damage);
         }
         public void SetCockpit(bool active)

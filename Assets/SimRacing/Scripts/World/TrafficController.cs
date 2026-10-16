@@ -9,14 +9,25 @@ namespace SimRacing
         {
             var prefab=Resources.Load<GameObject>("Vehicles/traffic_vehicle");
             if(!prefab){Debug.LogError("Traffic prefab missing");return;}
+
+            var merc=Resources.Load<GameObject>("Vehicles/mercedes_w210")?.GetComponent<VehicleDefinition>();
+            var ferr=Resources.Load<GameObject>("Vehicles/ferrari_f40")?.GetComponent<VehicleDefinition>();
+            var buga=Resources.Load<GameObject>("Vehicles/bugatti_centodieci")?.GetComponent<VehicleDefinition>();
+            var carDefs=new[]{merc, ferr, buga};
+
             for(int i=0;i<count;i++) {
                 var go=Instantiate(prefab,transform);go.name="Traffic "+i;
-                if(i%3==0) {
-                    var detailSource=Resources.Load<GameObject>("Vehicles/"+(i%9==0?"mercedes_w210":i%9==3?"ferrari_f40":"bugatti_centodieci")).GetComponent<VehicleDefinition>();
-                    var proxy=go.GetComponentsInChildren<Renderer>();var detail=VehicleVisual.Create(detailSource,go.transform);
-                    if(i%9==0){var sign=GameObject.CreatePrimitive(PrimitiveType.Cube);Destroy(sign.GetComponent<Collider>());sign.transform.SetParent(detail.transform,false);sign.transform.localPosition=new Vector3(0,1.55f,-.1f);sign.transform.localScale=new Vector3(.65f,.18f,.22f);sign.GetComponent<Renderer>().material.color=Color.yellow;}
-                    var lod=go.AddComponent<LODGroup>();lod.SetLODs(new[]{new LOD(.075f,detail.GetComponentsInChildren<Renderer>()),new LOD(.006f,proxy)});lod.RecalculateBounds();
+                // Disable incomplete wheel-less proxy renderers
+                foreach(var r in go.GetComponentsInChildren<Renderer>())r.enabled=false;
+
+                // Create full vehicle visual appearance with body and all 4 wheels
+                var def = carDefs[i % carDefs.Length] ?? carDefs[0];
+                if (def != null)
+                {
+                    var detail = VehicleVisual.Create(def, go.transform);
+                    foreach(var r in detail.GetComponentsInChildren<Renderer>())r.enabled=true;
                 }
+
                 var agent=go.AddComponent<TrafficAgent>();agent.track=track;agent.player=player;agent.session=session;
                 agent.index=(10+i*Mathf.Max(1,(track.route.Length-20)/Mathf.Max(1,count)))%track.route.Length;agent.direction=i%2==0?1:-1;agent.maxSpeed=Mathf.Min(60,session.Limit)/3.6f;
                 agent.Initialize();Cars.Add(agent);
@@ -53,15 +64,22 @@ namespace SimRacing
                 if(!hit.rigidbody)continue;
                 float gap=Mathf.Max(0,hit.distance-2.5f);allowed=Mathf.Min(allowed,gap/1.8f);
             }
-            speed=Mathf.MoveTowards(speed,allowed,(speed>allowed?5:1.8f)*Time.fixedDeltaTime);
+            if (crashCooldown > 0 && crashCooldown < 1.8f && allowed > 4f && speed < 3f)
+            {
+                speed = Mathf.MoveTowards(speed, maxSpeed * 0.45f, 3.5f * Time.fixedDeltaTime);
+            }
+            else
+            {
+                speed=Mathf.MoveTowards(speed,allowed,(speed>allowed?5:1.8f)*Time.fixedDeltaTime);
+            }
             body.MovePosition(body.position+desired*speed*Time.fixedDeltaTime);
             if(desired.sqrMagnitude>.01f)body.MoveRotation(Quaternion.Slerp(body.rotation,Quaternion.LookRotation(desired),1-Mathf.Exp(-8*Time.fixedDeltaTime)));
         }
         void OnCollisionEnter(Collision collision)
         {
-            if(collision.rigidbody!=player.Body || crashCooldown>0)return;crashCooldown=3;
+            if(collision.rigidbody!=player.Body || crashCooldown>0)return;crashCooldown=2.5f;
             if(collision.relativeVelocity.magnitude>3){session.Violation("Va chạm giao thông • Giữ khoảng cách an toàn");speed=0;}
-            if(collision.relativeVelocity.magnitude>15)wrecked=true;
+            if(collision.relativeVelocity.magnitude>22)wrecked=true;
         }
     }
 }

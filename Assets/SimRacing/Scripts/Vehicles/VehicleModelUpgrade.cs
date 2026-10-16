@@ -779,6 +779,7 @@ namespace SimRacing
 
             Vector3 wheelCenter = new Vector3(17.035f, 27.02f, 21.35f) * 0.020f;
             steerPivot.transform.localPosition = wheelCenter;
+            steerPivot.transform.localRotation = Quaternion.Euler(-16.4f, 0, 0);
 
             var steerChildren = new List<Transform>();
             foreach (Transform child in dashRoot.transform)
@@ -1008,7 +1009,11 @@ namespace SimRacing
                         universalDash.transform.localScale = Vector3.one;
 
                         var sw = universalDash.transform.Find("UniversalSteeringWheel");
-                        if (sw) car.definition.steeringWheel = sw;
+                        if (sw)
+                        {
+                            car.definition.steeringWheel = sw;
+                            car.ResetSteeringRest();
+                        }
                     }
                     else
                     {

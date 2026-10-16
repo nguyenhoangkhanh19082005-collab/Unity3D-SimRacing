@@ -87,7 +87,7 @@ namespace SimRacing
         public string Status => !string.IsNullOrEmpty(Error) ? Error : !Connected
             ? (SimulationApp.Instance && SimulationApp.Instance.Session && SimulationApp.Instance.Session.Active
                 ? ""
-                : "CHẾ ĐỘ BÀN PHÍM • W: Ga  |  S: Phanh/Lùi  |  A/D: Đánh lái  |  Space: Phanh tay")
+                : "CHẾ ĐỘ BÀN PHÍM • W: Ga  |  S: Phanh/Lùi  |  A/D: Đánh lái  |  Space: Phanh xe")
             : Raw.gearFault ? "LỖI CẦN SỐ • Về N, nhả ga, giữ phanh rồi F9"
             : Held ? "RIG TẠM KHÓA • Về N, nhả ga, giữ phanh rồi F9" : "";
         void OnDestroy() { Hold(); SendFeedback(0,0,0,0,0,false,false,0); socket?.Close(); }
