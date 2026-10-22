@@ -17,6 +17,8 @@ Bản chơi đã build sẵn nằm trong thư mục `SimRacing-Windows/` và lu�
 
 Để cập nhật lên bản mới nhất sau này, chạy `git pull` trong thư mục repo rồi mở lại game.
 
+Nếu Git báo `Filename too long`, hãy clone vào một thư mục có đường dẫn ngắn hơn (ví dụ `C:\SimRacing`), hoặc chạy `git config --global core.longpaths true` rồi clone lại.
+
 > Không dùng nút **Code → Download ZIP** của GitHub: file ZIP đó chỉ chứa "con trỏ" Git LFS chứ không chứa game. Nếu `Chay_SimRacing_Unity.bat` báo *chưa được tải đầy đủ*, chạy `git lfs install` rồi `git lfs pull` trong thư mục repo.
 
 Cách chơi, phím điều khiển và cách kết nối buồng lái: xem [HUONG_DAN.md](HUONG_DAN.md). Danh sách kiểm nghiệm: [KIEM_NGHIEM.md](KIEM_NGHIEM.md). Firmware buồng lái: `Hardware/firmware-Arduino IDE`.

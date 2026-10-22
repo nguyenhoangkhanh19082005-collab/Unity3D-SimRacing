@@ -112,10 +112,15 @@ namespace SimRacing.Editor
         // textures (TrackModelUpgrade), high-poly car OBJ models (VehicleModelUpgrade) and engine sounds (VehicleSound).
         static void CopyRuntimeData(string data)
         {
-            foreach(string stale in new[]{"Tracks","Imported","Audio","Car and transportation sounds collection"})
+            foreach(string stale in new[]{"Tracks","Imported","Cars","Audio","Car and transportation sounds collection"})
                 if(Directory.Exists(Path.Combine(data,stale)))Directory.Delete(Path.Combine(data,stale),true);
             foreach(string part in new[]{"SnowMountain","Textures"})CopyTree(Path.Combine("Assets/Imported/Tracks",part),Path.Combine(data,"Tracks",part),null);
-            CopyTree("Assets/Imported",Path.Combine(data,"Imported"),name=>name=="Tracks");
+            // Car models go to short folders (Cars/<car>) so a clone in a deep directory stays under the 260-char path limit
+            CopyTree("Assets/Imported/ferrari-f40/source/f40",Path.Combine(data,"Cars","ferrari"),null);
+            CopyTree("Assets/Imported/mercedes-benz-e-class-w210-sedan/source/Mercedes-Benz_E-class_W210_sedan_1996",Path.Combine(data,"Cars","mercedes"),null);
+            CopyTree("Assets/Imported/bugatti-centodieci/source/centi",Path.Combine(data,"Cars","bugatti"),null);
+            Directory.CreateDirectory(Path.Combine(data,"Imported"));
+            File.Copy("Assets/Imported/3d-model.obj",Path.Combine(data,"Imported","3d-model.obj"),true);
             CopyTree("Assets/Resources/Audio",Path.Combine(data,"Audio"),null);
         }
 

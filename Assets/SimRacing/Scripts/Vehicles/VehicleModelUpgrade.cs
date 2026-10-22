@@ -69,8 +69,11 @@ namespace SimRacing
                 rel = "Imported/bugatti-centodieci/source/centi/centi.obj";
             else return null;
 
+            string key = carId.Contains("ferrari") ? "ferrari" : carId.Contains("mercedes") ? "mercedes" : "bugatti";
             string[] candidates = new[]
             {
+                // Player builds ship each model in a short folder (SimRacing_Data/Cars/<car>) to stay under Windows' 260-char path limit
+                Path.Combine(Application.dataPath, "Cars", key, Path.GetFileName(rel)),
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", rel),
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, rel),
                 Path.Combine(Application.dataPath, rel),
