@@ -89,10 +89,46 @@ namespace SimRacing.Editor
         [MenuItem("SimRacing/Build Windows")]
         public static void Build()
         {
-            Prepare();Directory.CreateDirectory("Builds/Windows");
-            var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions{scenes=new[]{"Assets/Scenes/SimRacing.unity"},locationPathName="Builds/Windows/SimRacing.exe",target=BuildTarget.StandaloneWindows64,options=BuildOptions.None});
+            Prepare();
+            // Build straight into the committed game folder so a fresh clone runs without Unity (no second copy on disk).
+            string exe=Path.Combine(GameFolder,"SimRacing.exe");
+            if(Directory.Exists(GameFolder) && Directory.EnumerateFileSystemEntries(GameFolder).GetEnumerator().MoveNext() && !File.Exists(exe))
+                throw new Exception("Refusing to build into "+GameFolder+": it is not a SimRacing build");
+            Directory.CreateDirectory(GameFolder);
+            var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions{scenes=new[]{"Assets/Scenes/SimRacing.unity"},locationPathName=exe,target=BuildTarget.StandaloneWindows64,options=BuildOptions.None});
             if(report.summary.result!=BuildResult.Succeeded)throw new Exception("Build failed: "+report.summary.result);
+            CopyRuntimeData(Path.Combine(GameFolder,"SimRacing_Data"));
+            // Unity's debug-symbol folders must not ship
+            foreach(string folder in Directory.GetDirectories(GameFolder))
+                if(folder.EndsWith("_DoNotShip")||folder.EndsWith("_ButDontShipItWithYourGame"))Directory.Delete(folder,true);
+            Debug.Log("[SIMRACING GAME FOLDER] "+Path.GetFullPath(GameFolder));
             Debug.Log("[SIMRACING BUILD PASS] bytes="+report.summary.totalSize);
+        }
+
+        // Ready-to-run player committed to the repository (via Git LFS) so a fresh clone runs without Unity.
+        public const string GameFolder="SimRacing-Windows";
+
+        // Data the game reads from disk at runtime rather than from Unity assets: mountain pass meshes and track
+        // textures (TrackModelUpgrade), high-poly car OBJ models (VehicleModelUpgrade) and engine sounds (VehicleSound).
+        static void CopyRuntimeData(string data)
+        {
+            foreach(string stale in new[]{"Tracks","Imported","Audio","Car and transportation sounds collection"})
+                if(Directory.Exists(Path.Combine(data,stale)))Directory.Delete(Path.Combine(data,stale),true);
+            foreach(string part in new[]{"SnowMountain","Textures"})CopyTree(Path.Combine("Assets/Imported/Tracks",part),Path.Combine(data,"Tracks",part),null);
+            CopyTree("Assets/Imported",Path.Combine(data,"Imported"),name=>name=="Tracks");
+            CopyTree("Assets/Resources/Audio",Path.Combine(data,"Audio"),null);
+        }
+
+        static void CopyTree(string source,string target,Func<string,bool> skipDirectory)
+        {
+            Directory.CreateDirectory(target);
+            foreach(string file in Directory.GetFiles(source))
+                if(!file.EndsWith(".meta"))File.Copy(file,Path.Combine(target,Path.GetFileName(file)),true);
+            foreach(string directory in Directory.GetDirectories(source)) {
+                string name=Path.GetFileName(directory);
+                if(skipDirectory!=null && skipDirectory(name))continue;
+                CopyTree(directory,Path.Combine(target,name),skipDirectory);
+            }
         }
         public static void ReimportAndBuild(){SourceImporter.BuildAssets();Build();}
     }

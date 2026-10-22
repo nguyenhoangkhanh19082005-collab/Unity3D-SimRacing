@@ -21,3 +21,7 @@
 *.bin filter=lfs diff=lfs merge=lfs -text
 Assets/CartoonTracksPack1/**/*.png filter=lfs diff=lfs merge=lfs -text
 Assets/Imported/Tracks/**/*.png filter=lfs diff=lfs merge=lfs -text
+
+# Ready-to-run Windows game (exported by SimRacing > Build Windows) so a fresh clone runs without Unity
+SimRacing-Windows/** filter=lfs diff=lfs merge=lfs -text
+*.bat text eol=crlf

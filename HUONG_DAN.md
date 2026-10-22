@@ -63,4 +63,4 @@ Mã vận hành nằm trong `Assets/SimRacing/Scripts`, công cụ build trong `
 
 ## Kiểm tra
 
-Chạy bản Windows với `--verify` (tùy chọn `--rig-test-port=19999`) để game tự kiểm tra bằng buồng lái giả lập trên loopback: chế độ điều khiển, thời tiết ngẫu nhiên, lưới xuất phát và xe AI, kết quả cuộc đua, career, nhiên liệu và va chạm. Chế độ này không lưu tiến trình người chơi và từ chối cổng thật 9999. Báo cáo (`test-log.txt`, `runtime-report.txt`) và ảnh xuất vào `Builds/Windows/Verification`. Xem `KIEM_NGHIEM.md` để kiểm nghiệm bằng tay.
+Chạy bản Windows với `--verify` (tùy chọn `--rig-test-port=19999`) để game tự kiểm tra bằng buồng lái giả lập trên loopback: chế độ điều khiển, thời tiết ngẫu nhiên, lưới xuất phát và xe AI, kết quả cuộc đua, career, nhiên liệu và va chạm. Chế độ này không lưu tiến trình người chơi và từ chối cổng thật 9999. Báo cáo (`test-log.txt`, `runtime-report.txt`) và ảnh xuất vào thư mục `Verification` cạnh `SimRacing.exe`. Xem `KIEM_NGHIEM.md` để kiểm nghiệm bằng tay.

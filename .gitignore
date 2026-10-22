@@ -25,3 +25,6 @@
 *.py
 *.ps1
 __pycache__/
+/SimRacing-Windows/Verification/
+/SimRacing-Windows/*_DoNotShip/
+/SimRacing-Windows/*_ButDontShipItWithYourGame/

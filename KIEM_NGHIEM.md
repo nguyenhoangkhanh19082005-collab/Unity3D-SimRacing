@@ -1,14 +1,14 @@
 # Kiểm nghiệm bản cập nhật: Đua tranh hạng · Thời tiết ngẫu nhiên · Hai chế độ điều khiển
 
-Bản chạy: `Builds/Windows/SimRacing.exe` (hoặc `Chay_SimRacing_Unity.bat`). Mỗi mục bên dưới có thao tác và kết quả mong đợi.
+Bản chạy: `SimRacing-Windows/SimRacing.exe` (hoặc `Chay_SimRacing_Unity.bat`). Mỗi mục bên dưới có thao tác và kết quả mong đợi.
 
 ## 1. Kiểm tra tự động
 
 ```bat
-Builds\Windows\SimRacing.exe --verify
+SimRacing-Windows\SimRacing.exe --verify
 ```
 
-Game tự chạy khoảng 5 phút rồi tự thoát. Mở `Builds/Windows/Verification/test-log.txt`: mọi dòng phải là `[PASS]`, và `runtime-report.txt` phải ghi `Errors: 0`. Các bài liên quan bản cập nhật này:
+Game tự chạy khoảng 5 phút rồi tự thoát. Mở `SimRacing-Windows/Verification/test-log.txt`: mọi dòng phải là `[PASS]`, và `runtime-report.txt` phải ghi `Errors: 0`. Các bài liên quan bản cập nhật này:
 
 | Bài kiểm tra | Ý nghĩa |
 | --- | --- |
@@ -54,34 +54,6 @@ Game tự chạy khoảng 5 phút rồi tự thoát. Mở `Builds/Windows/Verifi
 4. Chạy đủ số vòng qua vạch đích → màn hình **VỀ ĐÍCH HẠNG p / 6** với bảng chung cuộc và giờ về đích. Thắng được 3 sao, podium 2 sao, về đích 1 sao.
 5. Nếu xe hỏng hoàn toàn: **KHÔNG HOÀN THÀNH CUỘC ĐUA**.
 
-## 5. Đưa lên GitHub
+## 5. Bản chơi trên GitHub
 
-Repo đã có remote `origin`. Các file nặng (psd, FBX, tga, wav, bin, texture png của trường đua) được khai báo trong `.gitattributes` để đi qua **Git LFS**. Riêng `road.psd` của CartoonTracksPack1 đã khoảng 550 MB, nên hãy kiểm tra hạn mức LFS của tài khoản GitHub trước khi đẩy.
-
-```bash
-git lfs install
-```
-
-```bash
-git switch -c feature/race-mode-controls-weather
-```
-
-```bash
-git add -A
-```
-
-```bash
-git lfs ls-files
-```
-
-Lệnh trên phải liệt kê `Assets/CartoonTracksPack1/Track1/Textures/road.psd` và `road_normal.png`. Nếu có, commit rồi đẩy:
-
-```bash
-git commit -m "feat: grid race vs AI, random weather, keyboard/rig control modes"
-```
-
-```bash
-git push -u origin feature/race-mode-controls-weather
-```
-
-Thư mục `Builds/`, `Library/`, các script `*.py` và `*.ps1` đã nằm trong `.gitignore`, nên không bị đẩy lên. Để phát hành bản chơi, nén `Builds/Windows` thành ZIP và đính kèm vào GitHub Release, không commit file ZIP.
+Thư mục `SimRacing-Windows/` là bản chơi đã build sẵn, nằm trong repo (qua Git LFS). Thành viên chỉ cần `git clone` rồi chạy `Chay_SimRacing_Unity.bat`, không cần cài Unity; xem [README.md](README.md). Sau mỗi lần sửa code: chọn **SimRacing → Build Windows** (lệnh này tự cập nhật `SimRacing-Windows/`), rồi commit và push cả thư mục đó.
