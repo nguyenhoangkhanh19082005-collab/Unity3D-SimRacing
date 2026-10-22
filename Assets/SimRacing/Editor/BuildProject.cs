@@ -30,7 +30,7 @@ namespace SimRacing.Editor
             pipeline.supportsHDR=true;pipeline.useSRPBatcher=true;
             var graphics=new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/GraphicsSettings.asset")[0]);
             var shaders=graphics.FindProperty("m_AlwaysIncludedShaders");
-            foreach(string shaderName in new[]{"SimRacing/Atmosphere","Universal Render Pipeline/Unlit","Universal Render Pipeline/Particles/Unlit"}) {
+            foreach(string shaderName in new[]{"SimRacing/Atmosphere","SimRacing/Wheel Smoke","Universal Render Pipeline/Unlit","Universal Render Pipeline/Particles/Unlit"}) {
                 var shader=Shader.Find(shaderName);if(!shader)continue;bool found=false;for(int i=0;i<shaders.arraySize;i++)found|=shaders.GetArrayElementAtIndex(i).objectReferenceValue==shader;
                 if(!found){shaders.InsertArrayElementAtIndex(shaders.arraySize);shaders.GetArrayElementAtIndex(shaders.arraySize-1).objectReferenceValue=shader;}
             }
@@ -64,13 +64,21 @@ namespace SimRacing.Editor
             foreach(string id in new[]{"coastal_track","race_circuit"}) {
                 var prefab=Resources.Load<GameObject>("Worlds/"+id);if(!prefab || prefab.GetComponent<TrackDefinition>().route.Length<200)throw new Exception("Missing route "+id);
                 Debug.Log("[ASSET PASS] "+id);
-                var world=UnityEngine.Object.Instantiate(prefab);var track=world.GetComponent<TrackDefinition>();Physics.SyncTransforms();int checkedPoints=0;
+                var world=UnityEngine.Object.Instantiate(prefab);var track=world.GetComponent<TrackDefinition>();
+                if(track.sceneryPrefabs!=null && track.sceneryPrefabs.Length>0) {
+                    // Same layout as TrackModelUpgrade at runtime: legacy children hidden, authored prefabs + generated route
+                    foreach(Transform child in world.transform)child.gameObject.SetActive(false);
+                    foreach(var c in world.GetComponents<Collider>())c.enabled=false;
+                    foreach(var scenery in track.sceneryPrefabs){if(!scenery)throw new Exception("Missing scenery prefab "+id);UnityEngine.Object.Instantiate(scenery,world.transform,false);}
+                    track.route=(Vector3[])TrackRoutes.CartoonOval.Clone();Physics.SyncTransforms();TrackModelUpgrade.AlignRouteToRoad(track);
+                }
+                Physics.SyncTransforms();int checkedPoints=0;
                 for(int i=0;i<track.route.Length;i+=2) {
                     Vector3 forward=(track.Point(i+1)-track.Point(i)).normalized;
                     foreach(float lane in new[]{-2.8f,0,2.8f}) {
                         Vector3 point=track.Point(i)+Vector3.Cross(Vector3.up,forward)*lane;bool road=false;
                         foreach(var hit in Physics.RaycastAll(point+Vector3.up*2.5f,Vector3.down,6))
-                            if(hit.normal.y>.4f && Mathf.Abs(hit.point.y-point.y)<.55f)road=true;
+                            if(hit.normal.y>.4f && Mathf.Abs(hit.point.y-point.y)<.55f+Mathf.Abs(lane)*.3f)road=true;
                         if(!road)throw new Exception("Road collision missing "+id+" point "+i+" lane "+lane);checkedPoints++;
                     }
                 }

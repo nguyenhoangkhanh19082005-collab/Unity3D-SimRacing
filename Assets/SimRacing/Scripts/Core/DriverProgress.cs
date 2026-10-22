@@ -28,6 +28,7 @@ namespace SimRacing
     {
         public bool passed;public int stars,xp,credits;public string feedback;
         public float time,bestLap,distance,health;public int violations;
+        public int position,racers;public string standings="";
     }
     public static class DriverProgress
     {
@@ -40,6 +41,7 @@ namespace SimRacing
         };
         public static Result Evaluate(DriveSession session)
         {
+            if(session.Race!=null)return EvaluateRace(session);
             var c=session.challenge;var car=session.car;
             bool passed=session.Completed && car.Recoveries==0 && car.Health>=(c?.min_health??75) && (!(c?.manual_required??false)||session.ManualLaunch);
             bool clean=session.Violations==0 && car.Health>=95;
@@ -48,6 +50,20 @@ namespace SimRacing
             return new Result{passed=passed,stars=stars,xp=passed?80+stars*55:20,credits=passed?300+stars*250:0,time=session.Elapsed,bestLap=session.BestLap,distance=session.Distance/1000,health=car.Health,violations=session.Violations,
                 feedback=!passed?"Hoàn thành đúng tuyến, điểm dừng và thao tác số tay; giữ xe nguyên vẹn, không cứu hộ.":!clean?"Giữ khoảng cách và tốc độ để có chuyến đi sạch hơn.":!bonus?"Quan sát xa, giảm tốc sớm và giữ nhịp lái ổn định.":"Chuyến đi ổn định. Bạn đã hoàn thành tốt mục tiêu."};
         }
+        /// <summary>Grid race: stars from the finishing position (win 3, podium 2, finish 1).</summary>
+        static Result EvaluateRace(DriveSession session)
+        {
+            var race=session.Race;var car=session.car;
+            race.MarkPlayerFinished(session.Completed,session.Elapsed);
+            int position=race.PlayerPosition,racers=race.Entries.Count;
+            bool passed=session.Completed;
+            int stars=!passed?0:position==1?3:position<=3?2:1;
+            return new Result{passed=passed,stars=stars,position=position,racers=racers,standings=race.StandingsReport(),
+                xp=passed?60+(racers-position+1)*45:20,credits=passed?200+(racers-position+1)*180:0,
+                time=session.Elapsed,bestLap=session.BestLap,distance=session.Distance/1000,health=car.Health,violations=session.Violations,
+                feedback=!passed?"Bỏ cuộc · Xe hỏng hoặc chưa hoàn thành đủ số vòng.":position==1?$"CHIẾN THẮNG! Bạn về nhất trong {racers} tay đua.":position<=3?$"Lên bục podium · Hạng {position}/{racers}.":$"Về đích hạng {position}/{racers}. Vào cua sớm hơn và giữ đà trên đoạn thẳng."};
+        }
+
         public static void Record(DriverProfile profile,DriveSession session,Result result,string key)
         {
             profile.xp+=result.xp;profile.credits+=result.credits;profile.distance+=result.distance;

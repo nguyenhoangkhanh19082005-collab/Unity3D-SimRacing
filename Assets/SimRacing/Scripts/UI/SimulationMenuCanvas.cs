@@ -37,6 +37,13 @@ namespace SimRacing
         private readonly List<Button> trackButtons = new List<Button>();
         private readonly List<Button> weatherButtons = new List<Button>();
         private readonly List<Button> careerButtons = new List<Button>();
+        private readonly List<Button> controlButtons = new List<Button>();
+        private readonly List<Button> difficultyButtons = new List<Button>();
+        private readonly List<Button> lapButtons = new List<Button>();
+        private GameObject raceOptions;
+        private Text pauseControlLabel;
+        private Text resultsStandings;
+        private static readonly int[] LapChoices = { 1, 3, 5 };
         private Text carSpecsText;
         private Text modeDescText;
         private Text rigMessageText;
@@ -156,8 +163,8 @@ namespace SimRacing
             var sideTitle = CreateText(sidebar.transform, "CHẾ ĐỘ ĐUA", 14, AccentColor, FontStyle.Bold, TextAnchor.MiddleLeft);
             SetRect(sideTitle.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(25, -45), new Vector2(-25, -20));
 
-            string[] modes = { "Lái tự do", "Đua nhanh", "Career" };
-            string[] modeIds = { "free", "race", "career" };
+            string[] modes = { "Lái tự do", "Đua tính giờ", "Đua tranh hạng", "Career" };
+            string[] modeIds = { "free", "race", "versus", "career" };
             for (int i = 0; i < modes.Length; i++)
             {
                 int idx = i;
@@ -208,14 +215,14 @@ namespace SimRacing
 
             // Floating Car Specs Badge (sits right above bottom control dock)
             var specsCard = CreatePanel(freeRaceSection.transform, new Color(0.04f, 0.07f, 0.11f, 0.78f),
-                new Vector2(0, 0), new Vector2(1, 0), new Vector2(15, 290), new Vector2(-15, 345));
+                new Vector2(0, 0), new Vector2(1, 0), new Vector2(15, 360), new Vector2(-15, 415));
 
             carSpecsText = CreateText(specsCard.transform, "", 16, AccentColor, FontStyle.Bold, TextAnchor.MiddleLeft);
             SetRect(carSpecsText.rectTransform, new Vector2(0, 0), new Vector2(1, 1), new Vector2(20, 0), new Vector2(-20, 0));
 
             // Bottom Control Dock (holds car, track, weather selection & launch button)
             var bottomDock = CreatePanel(freeRaceSection.transform, new Color(0.02f, 0.04f, 0.07f, 0.88f),
-                new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 0), new Vector2(0, 275));
+                new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 0), new Vector2(0, 345));
 
             // Car Selection Row
             var carLabel = CreateText(bottomDock.transform, "CHỌN XE", 13, AccentColor, FontStyle.Bold, TextAnchor.MiddleLeft);
@@ -242,13 +249,13 @@ namespace SimRacing
             var trackLabel = CreateText(bottomDock.transform, "CUNG ĐƯỜNG", 13, AccentColor, FontStyle.Bold, TextAnchor.MiddleLeft);
             SetRect(trackLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(20, -120), new Vector2(0, -98));
 
-            string[] trackNames = { "Đại Lộ Ven Biển", "Đèo Sơn Cước" };
+            string[] trackNames = { "Đèo Tuyết Sơn Cước", "Trường Đua Hoạt Hình Oval" };
             string[] trackIds = { "coastal", "mountain" };
-            float trackBtnW = 220f;
+            float trackBtnW = 230f;
             for (int i = 0; i < trackNames.Length; i++)
             {
                 int idx = i;
-                var btn = CreateStyledButton(bottomDock.transform, trackNames[i], 16, () =>
+                var btn = CreateStyledButton(bottomDock.transform, trackNames[i], 15, () =>
                 {
                     app.TrackId = trackIds[idx];
                     RefreshMenuContent();
@@ -259,9 +266,9 @@ namespace SimRacing
             }
 
             // Weather Selection Row
-            string[] weatherLabels = { "Nắng", "Mưa", "Sương mù", "Đêm" };
-            string[] weatherIds = { "clear", "rain", "fog", "night" };
-            float weatherW = 105f;
+            string[] weatherLabels = { "Ngẫu nhiên", "Nắng", "Mưa", "Sương mù", "Đêm" };
+            string[] weatherIds = { "random", "clear", "rain", "fog", "night" };
+            float weatherW = 100f;
             for (int i = 0; i < weatherLabels.Length; i++)
             {
                 int idx = i;
@@ -271,14 +278,65 @@ namespace SimRacing
                     RefreshMenuContent();
                 });
                 SetRect(btn.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1),
-                    new Vector2(490 + i * (weatherW + 10), -178), new Vector2(490 + i * (weatherW + 10) + weatherW, -128));
+                    new Vector2(520 + i * (weatherW + 10), -178), new Vector2(520 + i * (weatherW + 10) + weatherW, -128));
                 weatherButtons.Add(btn);
             }
 
             // Big Pulsing Ignition / Start Button
+            // Control Mode Row: physical ESP32 cockpit or keyboard (also switchable in-game with F10 / pause menu)
+            var controlLabel = CreateText(bottomDock.transform, "ĐIỀU KHIỂN", 13, AccentColor, FontStyle.Bold, TextAnchor.MiddleLeft);
+            SetRect(controlLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(20, -210), new Vector2(0, -188));
+            ControlMode[] controlModes = { ControlMode.Keyboard, ControlMode.Rig };
+            for (int i = 0; i < controlModes.Length; i++)
+            {
+                var mode = controlModes[i];
+                var btn = CreateStyledButton(bottomDock.transform, SimulationApp.ControlName(mode), 15, () =>
+                {
+                    app.SetControl(mode);
+                    app.SavePreferences();
+                    RefreshMenuContent();
+                });
+                SetRect(btn.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1),
+                    new Vector2(20 + i * 242, -262), new Vector2(20 + i * 242 + 230, -215));
+                controlButtons.Add(btn);
+            }
+
+            // Grid race options (only for "Đua tranh hạng")
+            raceOptions = new GameObject("RaceOptions");
+            raceOptions.transform.SetParent(bottomDock.transform, false);
+            SetStretch(raceOptions.AddComponent<RectTransform>());
+            var aiLabel = CreateText(raceOptions.transform, "ĐỐI THỦ AI", 13, AccentColor, FontStyle.Bold, TextAnchor.MiddleLeft);
+            SetRect(aiLabel.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(520, -210), new Vector2(800, -188));
+            for (int i = 0; i < RaceController.DifficultyNames.Length; i++)
+            {
+                int level = i;
+                var btn = CreateStyledButton(raceOptions.transform, RaceController.DifficultyNames[i], 15, () =>
+                {
+                    app.RaceDifficulty = level;
+                    RefreshMenuContent();
+                });
+                SetRect(btn.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1),
+                    new Vector2(520 + i * 98, -262), new Vector2(520 + i * 98 + 88, -215));
+                difficultyButtons.Add(btn);
+            }
+            var lapsLabel = CreateText(raceOptions.transform, "SỐ VÒNG", 13, AccentColor, FontStyle.Bold, TextAnchor.MiddleLeft);
+            SetRect(lapsLabel.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(830, -210), new Vector2(1100, -188));
+            for (int i = 0; i < LapChoices.Length; i++)
+            {
+                int laps = LapChoices[i];
+                var btn = CreateStyledButton(raceOptions.transform, laps + " vòng", 15, () =>
+                {
+                    app.RaceLaps = laps;
+                    RefreshMenuContent();
+                });
+                SetRect(btn.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1),
+                    new Vector2(830 + i * 98, -262), new Vector2(830 + i * 98 + 88, -215));
+                lapButtons.Add(btn);
+            }
+
             startButton = CreateStyledButton(bottomDock.transform, "BẮT ĐẦU CHUYẾN ĐI", 20, () => app.StartDrive(), IgnitionRed);
             SetRect(startButton.GetComponent<RectTransform>(), new Vector2(1, 1), new Vector2(1, 1),
-                new Vector2(-360, -178), new Vector2(-20, -50));
+                new Vector2(-360, -262), new Vector2(-20, -50));
 
             // Dock Footer info texts
             modeDescText = CreateText(bottomDock.transform, "", 14, TextMuted, FontStyle.Normal, TextAnchor.MiddleLeft);
@@ -362,7 +420,7 @@ namespace SimRacing
             SetRect(motionSlider.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1),
                 new Vector2(40, -270), new Vector2(490, -245));
 
-            var info1 = CreateText(panel.transform, "Lái xe bằng rig. Bàn phím dùng cho camera, tạm dừng và cứu hộ.", 16, TextInk, FontStyle.Normal, TextAnchor.MiddleLeft);
+            var info1 = CreateText(panel.transform, "Chế độ điều khiển (Bàn phím / Buồng lái thật) chọn ở màn hình chính, đổi khi đang lái bằng F10.", 16, TextInk, FontStyle.Normal, TextAnchor.MiddleLeft);
             SetRect(info1.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -340), new Vector2(520, -290));
 
             var info2 = CreateText(panel.transform, "Khởi hành: giữ phanh, về N, nhả ga → F9 → bật khóa và đề máy → đạp côn, vào số 1 và nhả côn từ từ.", 15, TextMuted, FontStyle.Normal, TextAnchor.MiddleLeft);
@@ -448,7 +506,7 @@ namespace SimRacing
 
             // Modal card
             var card = CreatePanel(pauseScreen.transform, BgColor,
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-280, -200), new Vector2(280, 200));
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-300, -240), new Vector2(300, 240));
 
             var title = CreateText(card.transform, "TẠM DỪNG", 28, TextInk, FontStyle.Bold, TextAnchor.MiddleCenter);
             SetRect(title.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, -70), new Vector2(0, -20));
@@ -457,11 +515,20 @@ namespace SimRacing
             SetRect(resumeBtn.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(1, 1),
                 new Vector2(40, -135), new Vector2(-40, -80));
 
+            var controlBtn = CreateStyledButton(card.transform, "", 17, () =>
+            {
+                app.ToggleControl();
+                RefreshPauseUI();
+            });
+            SetRect(controlBtn.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(1, 1),
+                new Vector2(40, -205), new Vector2(-40, -150));
+            pauseControlLabel = controlBtn.GetComponentInChildren<Text>();
+
             var toMenuBtn = CreateStyledButton(card.transform, "Trở về gara", 18, () => app.ToMenu());
             SetRect(toMenuBtn.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(1, 1),
-                new Vector2(40, -205), new Vector2(-40, -150));
+                new Vector2(40, -275), new Vector2(-40, -220));
 
-            var hint = CreateText(card.transform, "Sau khi tiếp tục: về N, nhả ga, giữ phanh rồi nhấn F9.", 15, TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
+            var hint = CreateText(card.transform, "Buồng lái: sau khi tiếp tục, về N, nhả ga, giữ phanh rồi nhấn F9.\nF10 đổi nhanh giữa bàn phím và buồng lái.", 15, TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
             SetRect(hint.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(20, 20), new Vector2(-20, 85));
         }
 
@@ -485,6 +552,9 @@ namespace SimRacing
 
             resultsFeedback = CreateText(panel.transform, "", 22, TextInk, FontStyle.Bold, TextAnchor.MiddleLeft);
             SetRect(resultsFeedback.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(50, -320), new Vector2(0, -240));
+
+            resultsStandings = CreateText(panel.transform, "", 19, TextInk, FontStyle.Normal, TextAnchor.UpperLeft);
+            SetRect(resultsStandings.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(50, -580), new Vector2(-50, -335));
 
             var toMenuBtn = CreateStyledButton(panel.transform, "TRỞ VỀ GARA", 20, () => app.ToMenu(), AccentColor);
             SetRect(toMenuBtn.GetComponent<RectTransform>(), new Vector2(0, 0), new Vector2(0, 0),
@@ -526,6 +596,7 @@ namespace SimRacing
             if (state == "menu") RefreshMenuContent();
             else if (state == "settings") RefreshSettingsUI();
             else if (state == "results") RefreshResultsUI();
+            else if (state == "pause") RefreshPauseUI();
         }
 
         private void RefreshMenuContent()
@@ -539,7 +610,7 @@ namespace SimRacing
             }
 
             // Mode navigation buttons
-            string[] modeIds = { "free", "race", "career" };
+            string[] modeIds = { "free", "race", "versus", "career" };
             for (int i = 0; i < modeButtons.Count; i++)
             {
                 SetButtonActive(modeButtons[i], app.Mode == modeIds[i]);
@@ -581,24 +652,36 @@ namespace SimRacing
                 }
 
                 // Weather buttons
-                string[] weatherIds = { "clear", "rain", "fog", "night" };
+                string[] weatherIds = { "random", "clear", "rain", "fog", "night" };
                 for (int i = 0; i < weatherButtons.Count; i++)
                 {
                     SetButtonActive(weatherButtons[i], app.Weather == weatherIds[i]);
                 }
 
+                for (int i = 0; i < controlButtons.Count; i++)
+                    SetButtonActive(controlButtons[i], (int)app.Control == i);
+                bool versus = app.Mode == "versus";
+                raceOptions.SetActive(versus);
+                for (int i = 0; i < difficultyButtons.Count; i++)
+                    SetButtonActive(difficultyButtons[i], app.RaceDifficulty == i);
+                for (int i = 0; i < lapButtons.Count; i++)
+                    SetButtonActive(lapButtons[i], app.RaceLaps == LapChoices[i]);
+
                 if (modeDescText)
                 {
-                    modeDescText.text = app.Mode == "race"
+                    modeDescText.text = versus
+                        ? $"Xuất phát từ lưới cùng 5 tay đua AI · {app.RaceLaps} vòng · Về đích trước để giành chiến thắng"
+                        : app.Mode == "race"
                         ? "3 vòng trên tuyến đóng · Đồng hồ vòng và ghost thành tích tốt nhất"
                         : "Giao thông hai chiều · Tiếp nhiên liệu · Cứu hộ khi dừng xe";
                 }
 
                 if (rigMessageText)
                 {
-                    rigMessageText.text = string.IsNullOrEmpty(app.Message)
-                        ? "Rig UDP 9999 · Ga, phanh, côn và cần số từ bộ điều khiển vật lý"
-                        : app.Message;
+                    rigMessageText.text = !string.IsNullOrEmpty(app.Message) ? app.Message
+                        : app.Control == ControlMode.Keyboard
+                        ? "Bàn phím · W/S ga-phanh, A/D lái, H đèn · F10 trong lúc lái để đổi sang buồng lái"
+                        : $"Buồng lái thật · ESP32 gửi UDP {app.Rig.Port} · {(app.Rig.Connected ? "ĐÃ KẾT NỐI " + app.Rig.PacketsPerSecond + " gói/giây" : "chưa nhận tín hiệu")}";
                 }
             }
             else
@@ -653,6 +736,12 @@ namespace SimRacing
             }
         }
 
+        private void RefreshPauseUI()
+        {
+            if (pauseControlLabel)
+                pauseControlLabel.text = $"Điều khiển: {SimulationApp.ControlName(app.Control)}   ⇄   Đổi (F10)";
+        }
+
         private void RefreshResultsUI()
         {
             var r = app.LastResult;
@@ -662,6 +751,8 @@ namespace SimRacing
             if (resultsStars) resultsStars.text = $"{r.stars} SAO    +{r.xp} XP    +{r.credits} CR";
             if (resultsStats) resultsStats.text = $"THỜI GIAN  {r.time:0.0} s       QUÃNG ĐƯỜNG  {r.distance:0.00} km       TÌNH TRẠNG XE  {r.health:0}%";
             if (resultsFeedback) resultsFeedback.text = r.feedback;
+            if (resultsStandings) resultsStandings.text = r.racers > 0 ? "KẾT QUẢ CHUNG CUỘC\n" + r.standings : "";
+            if (resultsTitle && r.racers > 0) resultsTitle.text = r.passed ? $"VỀ ĐÍCH HẠNG {r.position} / {r.racers}" : "KHÔNG HOÀN THÀNH CUỘC ĐUA";
         }
 
         private void Update()

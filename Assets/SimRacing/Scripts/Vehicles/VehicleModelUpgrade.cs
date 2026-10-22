@@ -169,9 +169,9 @@ namespace SimRacing
                 }
                 else if (name.Contains("glass") || name.Contains("window"))
                 {
-                    SetTransparent(m, new Color(0.15f, 0.22f, 0.26f, 0.40f), 0.95f);
-                    m.SetFloat("_Cull", 0f);
-                    m.doubleSidedGI = true;
+                    SetTransparent(m, new Color(0.15f, 0.22f, 0.26f, 0.20f), 0.90f);
+                    m.SetFloat("_Cull", 2f);
+                    m.doubleSidedGI = false;
                 }
                 else if (name.Contains("tyre") || name.Contains("tire"))
                 {
@@ -238,9 +238,9 @@ namespace SimRacing
                 }
                 else if (name.Contains("glass"))
                 {
-                    SetTransparent(m, new Color(0.15f, 0.22f, 0.26f, 0.38f), 0.95f);
-                    m.SetFloat("_Cull", 0f);
-                    m.doubleSidedGI = true;
+                    SetTransparent(m, new Color(0.15f, 0.22f, 0.26f, 0.20f), 0.90f);
+                    m.SetFloat("_Cull", 2f);
+                    m.doubleSidedGI = false;
                 }
                 else if (name == "tire")
                 {
@@ -328,9 +328,9 @@ namespace SimRacing
             materials["Meshpart28Mtl"] = carbonMat;
 
             Material glassMat = new Material(LitShader) { name = "Bugatti_Glass" };
-            SetTransparent(glassMat, new Color(0.85f, 0.92f, 0.96f, 0.18f), 0.98f);
-            glassMat.SetFloat("_Cull", 0f);
-            glassMat.doubleSidedGI = true;
+            SetTransparent(glassMat, new Color(0.85f, 0.92f, 0.96f, 0.12f), 0.92f);
+            glassMat.SetFloat("_Cull", 2f);
+            glassMat.doubleSidedGI = false;
             materials["Window1Mtl"] = glassMat;
             materials["Mirrors1Mtl"] = glassMat;
 
@@ -582,7 +582,7 @@ namespace SimRacing
                 Mesh mesh = CreateSubmesh(rawPositions, faceIndices, mirrorX);
                 if (mesh == null || mesh.vertexCount == 0) continue;
 
-                var subGo = new GameObject(grpName);
+                var subGo = new GameObject(grpName + "|" + mtlName);
                 subGo.transform.SetParent(root.transform, false);
 
                 var filter = subGo.AddComponent<MeshFilter>();

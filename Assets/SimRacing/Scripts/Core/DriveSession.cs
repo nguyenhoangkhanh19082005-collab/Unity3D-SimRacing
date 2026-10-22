@@ -4,7 +4,7 @@ namespace SimRacing
 {
     public sealed class DriveSession : MonoBehaviour
     {
-        public VehicleController car;public TrackDefinition track;public Challenge challenge;
+        public VehicleController car;public TrackDefinition track;public Challenge challenge;public RaceController Race;
         public bool FreeDrive,RoadRules,Active,Completed,Finished;
         public int TargetLaps=3,Laps,Violations,HarshBrakes;
         public float Elapsed,LapTime,BestLap=9999,Distance,RouteProgress,Overspeed;
@@ -73,7 +73,8 @@ namespace SimRacing
             previous=pos;noticeTimer-=dt;if(noticeTimer<=0)Notice="";
         }
         public void Violation(string text){if(!RoadRules)return;Violations++;Notice=text;noticeTimer=5;}
+        public void ShowNotice(string text,float seconds=4){Notice=text;noticeTimer=seconds;}
         public void Finish(){if(Finished)return;Finished=true;Active=false;car.Locked=true;car.rig.Hold();OnFinished?.Invoke(DriverProgress.Evaluate(this));}
-        public string Objective => challenge!=null && challenge.distance_m>0 ? (Remaining<6?"Dừng trong vòng xanh và giữ yên 2 giây":$"{challenge.name} · Còn {Remaining:0} m · {Limit:0} km/h") : FreeDrive?"LÁI TỰ DO · Giữ đúng làn và tốc độ":$"VÒNG {Mathf.Min(Laps+1,TargetLaps)} / {TargetLaps} · {LapTime:0.0} s";
+        public string Objective => Race!=null ? $"ĐUA TRANH HẠNG · VÒNG {Mathf.Min(Laps+1,TargetLaps)} / {TargetLaps} · HẠNG {Race.PlayerPosition} / {Race.Entries.Count}" : challenge!=null && challenge.distance_m>0 ? (Remaining<6?"Dừng trong vòng xanh và giữ yên 2 giây":$"{challenge.name} · Còn {Remaining:0} m · {Limit:0} km/h") : FreeDrive?"LÁI TỰ DO · Giữ đúng làn và tốc độ":$"VÒNG {Mathf.Min(Laps+1,TargetLaps)} / {TargetLaps} · {LapTime:0.0} s";
     }
 }

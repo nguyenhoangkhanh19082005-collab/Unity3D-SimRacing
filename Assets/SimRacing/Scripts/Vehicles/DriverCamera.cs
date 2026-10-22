@@ -20,7 +20,7 @@ namespace SimRacing
         void Awake()
         {
             view = GetComponent<Camera>();
-            view.nearClipPlane = .045f;
+            view.nearClipPlane = .025f;
             view.farClipPlane = 1800;
             var data = view.GetUniversalAdditionalCameraData();
             data.renderPostProcessing = true;
@@ -79,18 +79,19 @@ namespace SimRacing
                 var acceleration = car.Acceleration * Motion;
                 var head = Vector3.ClampMagnitude(new Vector3(-acceleration.x * .002f, -Mathf.Abs(acceleration.y) * .0004f, -acceleration.z * .0018f), .04f);
 
-                // Cockpit seating eye position tailored to each car cockpit geometry
+                // Cockpit seating eye position tailored to each car cockpit geometry, raised so the road and
+                // the bonnet stay visible over the dashboard (headroom measured from the imported models)
                 Vector3 eyePos;
                 if (car.definition != null && car.definition.id.Contains("ferrari"))
-                    eyePos = new Vector3(0.33f, 1.05f, 0.0f); // Ferrari bucket seat
+                    eyePos = new Vector3(0.33f, 1.02f, 0.02f); // Ferrari low sports bucket seat (roof 0.17 m above the old eye)
                 else if (car.definition != null && car.definition.id.Contains("bugatti"))
-                    eyePos = new Vector3(0.35f, 1.05f, -0.05f); // Bugatti low cockpit
+                    eyePos = new Vector3(0.35f, 1.06f, 0.02f); // Bugatti low cockpit, cabin shell hidden in cockpit view
                 else
-                    eyePos = new Vector3(0.35f, 1.10f, -0.28f); // Mercedes sedan driver eye position
+                    eyePos = new Vector3(0.35f, 1.08f, -0.15f); // Mercedes sedan driver eye position
 
                 transform.position = t.TransformPoint(eyePos + head);
                 look = Vector2.Lerp(look, new Vector2(input.lookX * 75, input.lookY * 30), 1 - Mathf.Exp(-14 * dt));
-                transform.rotation = t.rotation * Quaternion.Euler(2.92f + look.y + Mathf.Clamp(-acceleration.z * .057f, -.85f, .85f), -look.x, Mathf.Clamp(-acceleration.x * .103f, -1.4f, 1.4f));
+                transform.rotation = t.rotation * Quaternion.Euler(5f + look.y + Mathf.Clamp(-acceleration.z * .057f, -.85f, .85f), -look.x, Mathf.Clamp(-acceleration.x * .103f, -1.4f, 1.4f));
                 view.fieldOfView = 76;
             }
             else

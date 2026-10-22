@@ -41,17 +41,54 @@ namespace SimRacing
         Rigidbody body; float crashCooldown; float stuckTimer;
         static readonly RaycastHit[] hitBuffer = new RaycastHit[16];
 
+        Vector3 GetGroundPosition(Vector3 queryPos, out Vector3 groundNormal)
+        {
+            groundNormal = Vector3.up;
+            RaycastHit[] hits = Physics.RaycastAll(queryPos + Vector3.up * 4.5f, Vector3.down, 10.0f);
+            float bestY = -9999f;
+            Vector3 bestPoint = queryPos;
+            Vector3 bestNormal = Vector3.up;
+
+            for (int i = 0; i < hits.Length; i++)
+            {
+                var hit = hits[i];
+                if (hit.collider == null || hit.collider.isTrigger) continue;
+                if (hit.rigidbody != null) continue;
+                if (hit.normal.y < 0.6f) continue;
+
+                string cName = hit.collider.gameObject.name;
+                if (cName.Contains("Abyss") || cName.Contains("Safety")) continue;
+
+                if (hit.point.y > bestY)
+                {
+                    bestY = hit.point.y;
+                    bestPoint = hit.point;
+                    bestNormal = hit.normal;
+                }
+            }
+
+            if (bestY > -9000f)
+            {
+                groundNormal = bestNormal;
+                return bestPoint;
+            }
+            return queryPos;
+        }
+
         Vector3 Lane(int i)
         {
             Vector3 tangent = (track.Point(i + direction) - track.Point(i - direction)).normalized;
-            return track.Point(i) + Vector3.Cross(Vector3.up, tangent).normalized * 2.8f;
+            Vector3 raw = track.Point(i) + Vector3.Cross(Vector3.up, tangent).normalized * 2.8f;
+            return GetGroundPosition(raw, out _);
         }
 
         public void Initialize()
         {
             body = gameObject.AddComponent<Rigidbody>(); body.isKinematic = true; body.mass = 1400; body.interpolation = RigidbodyInterpolation.Interpolate;
-            var tangent = (Lane(index + direction) - Lane(index)).normalized;
-            transform.SetPositionAndRotation(Lane(index) + Vector3.up * .15f, Quaternion.LookRotation(tangent)); speed = maxSpeed * .7f;
+            Vector3 startPos = Lane(index);
+            Vector3 groundPt = GetGroundPosition(startPos, out Vector3 groundNormal);
+            Quaternion targetRot = Heading(Lane(index + direction) - startPos, groundNormal);
+            transform.SetPositionAndRotation(groundPt, targetRot); speed = maxSpeed * .7f;
             foreach (var light in GetComponentsInChildren<Light>()) light.enabled = false;
         }
 
@@ -59,15 +96,19 @@ namespace SimRacing
         {
             if (!body || wrecked) return;
             crashCooldown = Mathf.Max(0, crashCooldown - Time.fixedDeltaTime);
-            Vector3 target = Lane(index + direction) + Vector3.up * .15f;
+            Vector3 target = Lane(index + direction);
             float remaining = Vector3.Distance(body.position, target);
             if (remaining < Mathf.Max(1.5f, speed * Time.fixedDeltaTime * 1.5f))
             {
                 index = (index + direction + track.route.Length) % track.route.Length;
-                target = Lane(index + direction) + Vector3.up * .15f;
+                target = Lane(index + direction);
             }
 
-            Vector3 desired = (target - body.position).normalized;
+            // Steer on the horizontal plane only: a height difference between the body and the next lane point
+            // (banking, kerbs) must never pitch the car nose-up.
+            Vector3 desired = target - body.position;
+            desired.y = 0;
+            desired.Normalize();
             float allowed = maxSpeed;
             float sense = Mathf.Clamp(6f + speed * 1.8f, 6f, 30f);
 
@@ -128,8 +169,10 @@ namespace SimRacing
                 {
                     // Deadlock detected: advance past congestion to clear route point
                     index = (index + direction * 4 + track.route.Length) % track.route.Length;
-                    var newTangent = (Lane(index + direction) - Lane(index)).normalized;
-                    transform.SetPositionAndRotation(Lane(index) + Vector3.up * .15f, Quaternion.LookRotation(newTangent));
+                    var newPos = Lane(index);
+                    Vector3 groundPt = GetGroundPosition(newPos, out Vector3 groundNormal);
+                    Quaternion targetRot = Heading(Lane(index + direction) - newPos, groundNormal);
+                    transform.SetPositionAndRotation(groundPt, targetRot);
                     speed = maxSpeed * 0.7f;
                     stuckTimer = 0;
                 }
@@ -148,9 +191,24 @@ namespace SimRacing
                 speed = Mathf.MoveTowards(speed, allowed, (speed > allowed ? 5.5f : 2.0f) * Time.fixedDeltaTime);
             }
 
-            body.MovePosition(body.position + desired * speed * Time.fixedDeltaTime);
+            Vector3 nextPos = body.position + desired * speed * Time.fixedDeltaTime;
+            Vector3 groundPos = GetGroundPosition(nextPos, out Vector3 groundNorm);
+            nextPos.y = groundPos.y;
+
+            body.MovePosition(nextPos);
             if (desired.sqrMagnitude > .01f)
-                body.MoveRotation(Quaternion.Slerp(body.rotation, Quaternion.LookRotation(desired), 1 - Mathf.Exp(-8 * Time.fixedDeltaTime)));
+            {
+                Quaternion targetRot = Heading(desired, groundNorm);
+                body.MoveRotation(Quaternion.Slerp(body.rotation, targetRot, 1 - Mathf.Exp(-8 * Time.fixedDeltaTime)));
+            }
+        }
+
+        static Quaternion Heading(Vector3 direction, Vector3 groundNormal)
+        {
+            direction.y = 0;
+            if (direction.sqrMagnitude < 0.0001f) return Quaternion.identity;
+            if (groundNormal.y < 0.6f) groundNormal = Vector3.up;
+            return Quaternion.LookRotation(Vector3.ProjectOnPlane(direction, groundNormal).normalized, groundNormal);
         }
 
         void OnCollisionEnter(Collision collision)

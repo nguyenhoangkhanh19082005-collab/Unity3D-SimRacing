@@ -27,6 +27,11 @@ namespace SimRacing
             if(app.Rig.Port==9999){Debug.LogError("Verification refuses hardware port 9999");Application.Quit(2);yield break;}
             directory=Path.Combine(Application.dataPath,"..","Verification");Directory.CreateDirectory(directory);
             yield return new WaitForSecondsRealtime(2);yield return Capture("01-menu.png");
+            app.Mode="versus";yield return new WaitForSecondsRealtime(.5f);yield return Capture("01b-menu-versus.png");
+            // Random weather draws every preset over many trials
+            var seen=new HashSet<string>();for(int i=0;i<400;i++)seen.Add(SimulationApp.PickRandomWeather());
+            Check(seen.Count==SimulationApp.WeatherPresets.Length,"random weather covers every preset");
+            app.SetControl(ControlMode.Rig);app.Weather="clear";
             app.Mode="free";app.CarId="mercedes";app.TrackId="coastal";yield return app.LoadDrive();
             yield return new WaitForSecondsRealtime(3);
             Check(app.Car && app.Track && app.CameraRig,"drive loads");Check(app.Car.Grounded,"wheels settle on road");Check(app.Car.Health>99,"spawn does not damage car");
@@ -38,27 +43,86 @@ namespace SimRacing
             yield return new WaitForSecondsRealtime(3.5f);Check(app.Session.Active,"countdown starts session");
             flags=3;yield return new WaitForSecondsRealtime(.5f);flags=1;Check(app.Car.EngineRunning,"ignition and starter start engine");
             Vector3 origin=app.Car.transform.position;brake=0;clutch=0;gear=1;throttle=1600;
-            yield return new WaitForSecondsRealtime(4);Check(app.Car.Speed>5,"manual first gear accelerates");Check(Vector3.Distance(origin,app.Car.transform.position)>3,"vehicle moves along road");
+            yield return new WaitForSecondsRealtime(4);
+            Debug.Log($"[SPEED CHECK] Speed={app.Car.Speed:F3} dist={Vector3.Distance(origin,app.Car.transform.position):F3} RPM={app.Car.RPM:F1} motorTorque={app.Car.definition.torque}");
+            Check(app.Car.Speed>5,"manual first gear accelerates");Check(Vector3.Distance(origin,app.Car.transform.position)>3,"vehicle moves along road");
             yield return Capture("03-driving.png");
             throttle=0;brake=4095;clutch=4095;gear=0;
             yield return new WaitForSecondsRealtime(4);Check(app.Car.Speed<1,"brake stops car");
             brake=0;clutch=0;gear=6;throttle=1000;yield return new WaitForSecondsRealtime(1.3f);
-            Check(Vector3.Dot(app.Car.Body.linearVelocity,app.Car.transform.forward)<-.5f,"reverse gear moves backward");
+            float revDot = Vector3.Dot(app.Car.Body.linearVelocity,app.Car.transform.forward);
+            Debug.Log($"[REVERSE CHECK] revDot={revDot:F3} Speed={app.Car.Speed:F3} vel={app.Car.Body.linearVelocity}");
+            Check(revDot<-.5f,"reverse gear moves backward");
             throttle=0;brake=clutch=4095;gear=0;yield return new WaitForSecondsRealtime(2);
             sending=false;yield return new WaitForSecondsRealtime(.4f);Check(!app.Rig.Connected && app.Rig.Held,"timeout holds rig");
             sending=true;yield return new WaitForSecondsRealtime(.3f);Check(app.Rig.Held,"reconnection does not auto resume");
             app.Rig.SendMessage("OnApplicationFocus",true);Check(app.Rig.Resume(),"explicit resume after timeout");
             app.Pause();yield return new WaitForSecondsRealtime(.1f);Check(app.Rig.Held && Time.timeScale==0,"pause holds rig");app.Resume();
             app.Rig.SendMessage("OnApplicationFocus",true);app.Rig.Resume();flags=1|16|64|4;
-            yield return new WaitForSecondsRealtime(.3f);Check(app.Car.Controls.headlights==2 && app.Car.Controls.wipers==2 && app.Car.Controls.hazard,"live lights wipers hazard reach car");
+            yield return new WaitForSecondsRealtime(.3f);Check(app.Car.Controls.headlights==2 && app.Car.Controls.hazard,"live lights and hazard reach car");
             foreach(string weather in new[]{"rain","fog","night","clear"}) {app.Weather=weather;app.Presentation.SetWeather(weather);yield return new WaitForSecondsRealtime(1.2f);yield return Capture("04-"+weather+".png");}
             for(int mode=2;mode<4;mode++){app.CameraRig.Mode=mode;yield return new WaitForSecondsRealtime(.5f);yield return Capture("04-camera-"+mode+".png");}
             app.CameraRig.Mode=1;yield return new WaitForSecondsRealtime(1);yield return Capture("05-exterior.png");
             Check(app.Car.Health>90,"normal road drive does not cause false crash damage");
             Check(app.Car.Recover(false),"stationary recovery");Check(app.Car.Recoveries==1 && app.Rig.Held,"recovery invalidates attempt and holds rig");
+            // Control modes: the keyboard mode must ignore a live rig, and switching back to the rig waits for F9
+            yield return new WaitForSecondsRealtime(2.1f);
+            app.SetControl(ControlMode.Keyboard);flags=1;gear=1;clutch=0;brake=0;throttle=4095;
+            yield return new WaitForSecondsRealtime(1.5f);
+            Check(app.Car.KeyboardDriving && app.Rig.Held && app.Car.Speed<3,"keyboard mode ignores rig pedals");
+            app.SetControl(ControlMode.Rig);yield return null;
+            Check(!app.Car.KeyboardDriving && app.Rig.Held,"switching to rig mode waits for F9 takeover");
+            throttle=0;brake=clutch=4095;gear=0;flags=0;yield return new WaitForSecondsRealtime(.3f);
             sending=false;sender.Close();sender=null;
+            app.SetControl(ControlMode.Keyboard);
             app.Mode="race";app.CarId="ferrari";app.TrackId="mountain";yield return app.LoadDrive();yield return new WaitForSecondsRealtime(3);
             Check(app.Car.Grounded && app.Car.Health>99,"Ferrari mountain spawn");app.Car.Body.position+=app.Car.transform.forward*15f;app.CameraRig.Mode=1;yield return new WaitForSecondsRealtime(1);yield return Capture("06-mountain-ferrari.png");
+            app.CameraRig.Mode=0;yield return new WaitForSecondsRealtime(1);yield return Capture("06b-mountain-cockpit.png");app.CameraRig.Mode=1;
+            var savedPos = app.Car.Body.position; var savedRot = app.Car.Body.rotation;
+            app.Car.Body.position = app.Track.fuelStation + Vector3.up * 0.7f;
+            app.Car.Body.rotation = Quaternion.Euler(0, 90, 0);
+            yield return new WaitForSecondsRealtime(1);
+            yield return Capture("06c-oval-gas-station.png");
+            app.Car.Body.position = savedPos; app.Car.Body.rotation = savedRot;
+
+            // Multi-angle verification captures for assembled Cartoon Oval
+            app.CameraRig.enabled = false;
+            var ovalCam = Camera.main ?? app.CameraRig.GetComponentInChildren<Camera>();
+            Vector3 savedOvalCamPos = ovalCam.transform.position; Quaternion savedOvalCamRot = ovalCam.transform.rotation;
+
+            // 1. Panoramic high aerial overview of the oval, infield road course, paddock and grandstands
+            ovalCam.transform.position = new Vector3(0f, 160f, 60f);
+            ovalCam.transform.LookAt(new Vector3(0f, 0f, -160.5f));
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Capture("06d-oval-aerial-overview.png");
+
+            // 2. Turn 1 banking seen from the end of the main straight
+            ovalCam.transform.position = new Vector3(150f, 6f, -31f);
+            ovalCam.transform.LookAt(new Vector3(270f, 2f, -130f));
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Capture("06e-oval-turn1-action.png");
+
+            // 3. Pit lane, team garages, and pit wall
+            ovalCam.transform.position = new Vector3(-60f, 3.2f, -12.5f);
+            ovalCam.transform.LookAt(new Vector3(0f, 1.8f, -12.5f));
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Capture("06f-oval-pit-paddock.png");
+
+            ovalCam.transform.position = savedOvalCamPos; ovalCam.transform.rotation = savedOvalCamRot;
+            app.CameraRig.enabled = true;
+
+            // Traffic on the oval: every car must stay upright on the banked turns
+            app.Mode="free";app.TrackId="mountain";yield return app.LoadDrive();yield return new WaitForSecondsRealtime(8);
+            var ovalTraffic=FindFirstObjectByType<TrafficController>();bool upright=ovalTraffic && ovalTraffic.Cars.Count>0;
+            if(ovalTraffic)foreach(var agent in ovalTraffic.Cars)upright&=agent && agent.transform.up.y>.8f;
+            Check(upright,"oval traffic upright");
+            if(ovalTraffic && ovalTraffic.Cars.Count>0) {
+                var trafficCam=Camera.main ?? app.CameraRig.GetComponentInChildren<Camera>();app.CameraRig.enabled=false;
+                var first=ovalTraffic.Cars[0].transform;trafficCam.transform.position=first.position-first.forward*12+Vector3.up*5;trafficCam.transform.LookAt(first.position+Vector3.up);
+                yield return new WaitForSecondsRealtime(.5f);yield return Capture("06g-oval-traffic.png");app.CameraRig.enabled=true;
+            }
+            yield return GridRace();
+            app.Mode="race";app.Weather="clear";
             app.CarId="bugatti";app.TrackId="coastal";yield return app.LoadDrive();yield return new WaitForSecondsRealtime(3);Check(app.Car.Grounded && app.Car.Health>99,"Bugatti coastal spawn");
             app.Car.Body.position+=app.Car.transform.forward*15f;
             
@@ -121,8 +185,50 @@ namespace SimRacing
             ScreenCapture.CaptureScreenshot(Path.Combine(directory,name));
             yield return null;
         }
+        IEnumerator GridRace()
+        {
+            app.Mode="versus";app.CarId="ferrari";app.TrackId="mountain";app.RaceLaps=1;app.RaceDifficulty=1;app.Weather="random";
+            yield return app.LoadDrive();
+            Check(Array.IndexOf(SimulationApp.WeatherPresets,app.ActiveWeather)>=0,"random weather resolves to a preset ("+app.ActiveWeather+")");
+            var race=app.Race;
+            Check(race && race.Entries.Count==6 && race.PlayerEntry!=null,"grid race spawns player and 5 AI racers");
+            if(!race)yield break;
+            app.CameraRig.Mode=1;
+            yield return new WaitForSecondsRealtime(3.6f);
+            Check(app.Session.Active,"race countdown starts the session");
+            yield return new WaitForSecondsRealtime(2.2f);yield return Capture("06h-race-start.png");
+            yield return new WaitForSecondsRealtime(8);
+            bool moving=true,upright=true;
+            foreach(var e in race.Entries) if(e.Ai) {moving&=e.Progress>60;upright&=e.Ai.transform.up.y>.8f && Mathf.Abs(e.Ai.transform.position.y-RaceController.Ground(e.Ai.transform.position,e.Ai.transform.position.y,out _).y)<.6f;}
+            Check(moving,"AI racers drive away from the grid");Check(upright,"AI racers stay upright on the road");
+            Check(race.PlayerPosition==race.Entries.Count,"standings rank the stationary player last");
+            var cam=app.CameraRig.view;app.CameraRig.enabled=false;
+            var leader=race.Standings[0].Ai?race.Standings[0].Ai.transform:app.Car.transform;
+            cam.transform.position=leader.position-leader.forward*14+Vector3.up*5;cam.transform.LookAt(leader.position+leader.forward*10);
+            yield return new WaitForSecondsRealtime(.5f);yield return Capture("06i-race-pack.png");app.CameraRig.enabled=true;
+            float deadline=Time.unscaledTime+120;
+            while(Time.unscaledTime<deadline && !race.Entries.Exists(e=>e.Ai && e.Finished))yield return null;
+            Check(race.Entries.Exists(e=>e.Ai && e.Finished),"AI racer completes the race distance");
+            app.Session.Completed=true;app.Session.Finish();
+            yield return new WaitForSecondsRealtime(.6f);
+            var r=app.LastResult;
+            Check(r!=null && r.racers==6 && r.position>1 && r.standings.Contains("BẠN"),"race results rank the player among the field");
+            yield return Capture("06j-race-results.png");
+
+            // Same race on the narrow, hilly mountain pass
+            app.TrackId="coastal";app.CarId="mercedes";app.Weather="clear";yield return app.LoadDrive();
+            race=app.Race;app.CameraRig.Mode=1;
+            yield return new WaitForSecondsRealtime(3.6f+10f);
+            moving=upright=race!=null;
+            if(race)foreach(var e in race.Entries) if(e.Ai) {moving&=e.Progress>60;upright&=e.Ai.transform.up.y>.8f && Mathf.Abs(e.Ai.transform.position.y-RaceController.Ground(e.Ai.transform.position,e.Ai.transform.position.y,out _).y)<.6f;}
+            Check(moving && upright,"AI racers drive the mountain pass");
+            if(race){var lead=race.Standings[0].Ai?race.Standings[0].Ai.transform:app.Car.transform;app.CameraRig.enabled=false;cam=app.CameraRig.view;
+                cam.transform.position=lead.position-lead.forward*12+Vector3.up*4.5f;cam.transform.LookAt(lead.position+lead.forward*8);
+                yield return new WaitForSecondsRealtime(.5f);yield return Capture("06k-race-mountain.png");app.CameraRig.enabled=true;}
+        }
         IEnumerator CareerAndSaves()
         {
+            app.SetControl(ControlMode.Rig);
             encoder=throttle=gear=flags=0;brake=clutch=4095;
             app.Mode="career";app.ChallengeIndex=0;yield return app.LoadDrive();yield return new WaitForSecondsRealtime(2);
             sender=new UdpClient();sender.Connect(IPAddress.Loopback,app.Rig.Port);sending=true;
@@ -160,9 +266,11 @@ namespace SimRacing
         }
         IEnumerator FuelAndImpact()
         {
+            app.SetControl(ControlMode.Keyboard);
             app.Mode="free";app.CarId="mercedes";app.TrackId="coastal";yield return app.LoadDrive();
             app.Car.Body.position=app.Track.fuelStation+Vector3.up*.7f;app.Car.Body.linearVelocity=Vector3.zero;app.Car.Fuel=20;
             yield return new WaitForSecondsRealtime(2.5f);Check(app.Car.Refueling && app.Car.Fuel>24,"stopped engine-off vehicle refuels at station");
+            app.CameraRig.Mode=1;yield return new WaitForSecondsRealtime(0.5f);yield return Capture("09-coastal-gas-station.png");app.CameraRig.Mode=0;
             app.Car.Body.position=app.Track.spawnPosition+Vector3.up*.15f;app.Car.Body.rotation=app.Track.spawnRotation;
             yield return new WaitForSecondsRealtime(1);
             var wall=GameObject.CreatePrimitive(PrimitiveType.Cube);wall.name="Verification impact fixture";wall.transform.position=app.Car.transform.position+app.Car.transform.forward*8+Vector3.up;wall.transform.rotation=app.Car.transform.rotation;wall.transform.localScale=new Vector3(7,3,.5f);

@@ -19,7 +19,7 @@ namespace SimRacing.Editor
             Check(RigProtocol.Newer(2,uint.MaxValue-2),"timestamp wrap");Check(!RigProtocol.Newer(10,10),"duplicate timestamp");Check(!RigProtocol.Newer(9,10),"old timestamp");
             b=RuntimeVerification.Packet(105,8000,4095,0,0,6,0x3ff);Check(RigProtocol.TryDecode(b,c,out sample),"all accessories");
             Check(sample.steer==1 && sample.throttle==1 && sample.brake==0 && sample.clutch==0 && sample.gear==6,"controls");
-            Check(sample.ignition && sample.starter && sample.hazard && sample.headlights==2 && sample.wipers==2 && sample.horn && sample.left && sample.right,"accessories");
+            Check(sample.ignition && sample.starter && sample.hazard && sample.headlights==2 && sample.horn && sample.left && sample.right,"accessories");
             b[26]=1;RigProtocol.TryDecode(b,c,out sample);Check(sample.gearFault && !sample.Ready,"gear fault");
             var fb=RigProtocol.Feedback(-500,80,3000,3,45,true,sample,true,256,123);
             Check(fb.Length==16 && RigProtocol.U16(fb,0)==0x4642,"feedback framing");Check(unchecked((short)RigProtocol.U16(fb,2))==-500,"signed feedback");Check(RigProtocol.U16(fb,4)==800 && RigProtocol.U16(fb,6)==3000 && fb[13]==255,"telemetry bounds");

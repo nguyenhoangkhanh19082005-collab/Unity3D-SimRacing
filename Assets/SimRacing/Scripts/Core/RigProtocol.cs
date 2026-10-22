@@ -30,7 +30,7 @@ namespace SimRacing
     public struct RigSample
     {
         public uint stamp;
-        public int encoder, throttleADC, brakeADC, clutchADC, gear, headlights, wipers;
+        public int encoder, throttleADC, brakeADC, clutchADC, gear, headlights;
         public float steer, throttle, brake, clutch, lookX, lookY;
         public bool ignition, starter, hazard, horn, left, right, cameraButton, gearFault;
         public bool Ready => !gearFault && throttle <= .03f && brake >= .5f && gear == 0 && !starter;
@@ -74,7 +74,7 @@ namespace SimRacing
             s.gear = b[18]; int mask = U16(b, 19);
             s.ignition = (mask & 1) != 0; s.starter = (mask & 2) != 0; s.hazard = (mask & 4) != 0;
             s.headlights = (mask & 16) != 0 ? 2 : (mask & 8) != 0 ? 1 : 0;
-            s.wipers = (mask & 64) != 0 ? 2 : (mask & 32) != 0 ? 1 : 0;
+            // Mask bits 32/64 (wiper switch) stay reserved in the packet format but are ignored: the game has no wipers.
             s.horn = (mask & 128) != 0; s.left = (mask & 256) != 0; s.right = (mask & 512) != 0;
             s.lookX = Mathf.Clamp((U16(b, 21) - 2048) / 2048f, -1, 1);
             s.lookY = Mathf.Clamp((U16(b, 23) - 2048) / 2048f, -1, 1);

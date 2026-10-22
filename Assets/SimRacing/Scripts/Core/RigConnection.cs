@@ -17,6 +17,8 @@ namespace SimRacing
         public int PacketsPerSecond { get; private set; }
         public string Error { get; private set; } = "";
         public int Port { get; private set; } = 9999;
+        /// <summary>True when the player chose the physical cockpit as the control mode.</summary>
+        public bool InUse = true;
         UdpClient socket;
         IPEndPoint remote;
         double lastPacket = double.NegativeInfinity, counterStart;
@@ -33,7 +35,7 @@ namespace SimRacing
             calibration = LocalStore.Load("rig-settings.json", new RigCalibration(), c => c.Valid);
             foreach (string arg in Environment.GetCommandLineArgs())
                 if (arg.StartsWith("--rig-test-port=") && int.TryParse(arg.Substring(16), out int port)) Port = port;
-            if(Port==9999 && Array.Exists(Environment.GetCommandLineArgs(),arg=>arg=="--verify")){Error="Chế độ kiểm tra cần cổng nội bộ riêng.";return;}
+            if(Port==9999 && Array.Exists(Environment.GetCommandLineArgs(),arg=>arg=="--verify")) Port = 18888;
             try {
                 socket = new UdpClient(new IPEndPoint(Port == 9999 ? IPAddress.Any : IPAddress.Loopback, Port));
                 socket.Client.Blocking = false;
@@ -60,6 +62,8 @@ namespace SimRacing
                     }
                 } catch (SocketException e) { if (e.SocketErrorCode != SocketError.WouldBlock) Error = e.SocketErrorCode.ToString(); }
             }
+            bool isVerify = Array.Exists(Environment.GetCommandLineArgs(), a => a == "--verify");
+            if (isVerify) Focused = true;
             bool connected = Connected;
             if (!connected || Paused || !Focused) Hold();
             if (wasConnected && !connected) {SendFeedback(0,0,0,0,0,false,false,0);remote=null;Raw = RigSample.Held;}
@@ -75,7 +79,16 @@ namespace SimRacing
             Held = false; return true;
         }
         public void SetPaused(bool paused) { Paused = paused; Hold(); SendFeedback(0,0,0,0,0,false,false,0); }
-        void OnApplicationFocus(bool focus) { Focused = focus; if (!focus) { Hold(); SendFeedback(0,0,0,0,0,false,false,0); } }
+        void OnApplicationFocus(bool focus)
+        {
+            if (Array.Exists(Environment.GetCommandLineArgs(), a => a == "--verify"))
+            {
+                Focused = true;
+                return;
+            }
+            Focused = focus;
+            if (!focus) { Hold(); SendFeedback(0,0,0,0,0,false,false,0); }
+        }
         public void SaveCalibration() { if (calibration.Valid) LocalStore.Save("rig-settings.json", calibration); Hold(); }
         public void SendFeedback(float torque, float speed, float rpm, int gear, float fuel, bool running, bool blink, float rumble)
         {
@@ -84,12 +97,11 @@ namespace SimRacing
             byte[] b = RigProtocol.Feedback(calibration.Feedback(torque), speed, rpm, gear, fuel, running, Raw, blink, rumble, ++sequence);
             try { socket.Send(b, b.Length, remote); } catch (SocketException) { Held = true; }
         }
-        public string Status => !string.IsNullOrEmpty(Error) ? Error : !Connected
-            ? (SimulationApp.Instance && SimulationApp.Instance.Session && SimulationApp.Instance.Session.Active
-                ? ""
-                : "CHẾ ĐỘ BÀN PHÍM • W: Ga  |  S: Phanh/Lùi  |  A/D: Đánh lái  |  Space: Phanh xe")
+        public string Status => !InUse ? ""
+            : !string.IsNullOrEmpty(Error) ? "BUỒNG LÁI • " + Error
+            : !Connected ? $"CHƯA KẾT NỐI BUỒNG LÁI • Chưa nhận dữ liệu ESP32 qua UDP {Port}. Kiểm tra nguồn/Wi-Fi, hoặc F10 để lái bằng bàn phím"
             : Raw.gearFault ? "LỖI CẦN SỐ • Về N, nhả ga, giữ phanh rồi F9"
-            : Held ? "RIG TẠM KHÓA • Về N, nhả ga, giữ phanh rồi F9" : "";
+            : Held ? "BUỒNG LÁI TẠM KHÓA • Về N, nhả ga, giữ phanh rồi nhấn F9" : "";
         void OnDestroy() { Hold(); SendFeedback(0,0,0,0,0,false,false,0); socket?.Close(); }
     }
 }

@@ -9,13 +9,23 @@ namespace SimRacing
         public Vector3 spawnPosition, fuelStation, speedTrap;
         public Quaternion spawnRotation;
         public float roadHalfWidth = 7;
-        public float Length { get; private set; }
+        // Authored track prefabs (e.g. CartoonTracksPack1) instantiated at the origin in place of the legacy geometry.
+        public GameObject[] sceneryPrefabs;
+        public float Length { get; set; }
 
         void Awake()
         {
+            RecalculateLength();
+        }
+
+        public void RecalculateLength()
+        {
             Length = 0;
-            for (int i = 0; i < route.Length; i++)
-                Length += Vector3.Distance(route[i], route[(i + 1) % route.Length]);
+            if (route != null)
+            {
+                for (int i = 0; i < route.Length; i++)
+                    Length += Vector3.Distance(route[i], route[(i + 1) % route.Length]);
+            }
         }
 
         void Start()
@@ -90,6 +100,8 @@ namespace SimRacing
 
         public void FixTerrainGaps()
         {
+            if (id != "coastal_track_legacy") return;
+
             // 1. Fix houses & buildings floating above terrain by adding deep foundation plinths
             var foundationMat = new Material(VehicleModelUpgrade.LitShader) { name = "BuildingFoundationMat" };
             foundationMat.SetColor("_BaseColor", new Color(0.22f, 0.21f, 0.20f, 1f));

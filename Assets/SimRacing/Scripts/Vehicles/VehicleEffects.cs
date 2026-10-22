@@ -39,13 +39,17 @@ namespace SimRacing
             smokeTexture.SetPixels(colors);
             smokeTexture.Apply();
 
-            particleMaterial = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
+            var smokeShader = Shader.Find("SimRacing/Wheel Smoke");
+            particleMaterial = new Material(smokeShader ? smokeShader : Shader.Find("Universal Render Pipeline/Particles/Unlit"));
             particleMaterial.mainTexture = smokeTexture;
-            particleMaterial.SetFloat("_Surface", 1);
-            particleMaterial.SetFloat("_SrcBlend", 5);
-            particleMaterial.SetFloat("_DstBlend", 10);
-            particleMaterial.SetFloat("_ZWrite", 0);
-            particleMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            if (!smokeShader)
+            {
+                particleMaterial.SetFloat("_Surface", 1);
+                particleMaterial.SetFloat("_SrcBlend", 5);
+                particleMaterial.SetFloat("_DstBlend", 10);
+                particleMaterial.SetFloat("_ZWrite", 0);
+                particleMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            }
             particleMaterial.renderQueue = 3000;
 
             skidMaterial = new Material(Shader.Find("Universal Render Pipeline/Unlit"));

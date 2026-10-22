@@ -11,6 +11,7 @@ namespace SimRacing
         public Rigidbody Body { get; private set; }
         public RigConnection rig;
         public TrackDefinition track;
+        public VehicleSound Sound { get; private set; }
         public float Speed { get; private set; }
         public float RPM { get; private set; }
         public float Fuel = 60, Health = 100, Grip = 1, TopSpeed;
@@ -27,12 +28,15 @@ namespace SimRacing
         Quaternion[] wheelRest;
         float age, feedbackClock, recoveryClock, blinkClock, smoothKeyboardSteer, spaceBrakeTime;
         bool refuelRequested;
+        RigSample keyboardSample = RigSample.Held;
+        int keyboardHeadlights;
         Light[] headlamps;
-        Transform[] wipers;
-        Quaternion[] wiperRest;
         TextMesh[] statusLabels;
         public bool Blink => blinkClock % 1 < .5f;
-        public RigSample Controls => rig ? rig.Controls : RigSample.Held;
+        /// <summary>Set by SimulationApp from the chosen control mode; false means the physical rig drives the car.</summary>
+        public bool KeyboardDriving = true;
+        public RigSample Controls => KeyboardDriving ? keyboardSample : rig ? rig.Controls : RigSample.Held;
+        public void SetKeyboardLights(int headlights) { keyboardHeadlights = headlights; }
         public void ResetSteeringRest() { if (definition.steeringWheel) steeringRest = definition.steeringWheel.localRotation; }
         void Awake()
         {
@@ -43,33 +47,35 @@ namespace SimRacing
             wheelRest=definition.wheelVisuals.Select(t=>t.localRotation).ToArray();
             if(definition.steeringWheel)steeringRest=definition.steeringWheel.localRotation;
             headlamps=GetComponentsInChildren<Light>(true).Where(x=>x.type==LightType.Spot && x.transform.localPosition.z>0).ToArray();
-            wipers=GetComponentsInChildren<Transform>(true).Where(x=>x.name=="WiperLeft"||x.name=="WiperRight").ToArray();
-            wiperRest=wipers.Select(x=>x.localRotation).ToArray();statusLabels=GetComponentsInChildren<TextMesh>(true);
+            // Windscreen wipers are not part of the game: hide any wiper meshes left in the vehicle prefabs.
+            foreach(var wiper in GetComponentsInChildren<Transform>(true).Where(x=>x.name=="WiperLeft"||x.name=="WiperRight"))wiper.gameObject.SetActive(false);
+            statusLabels=GetComponentsInChildren<TextMesh>(true);
             foreach(var wheel in definition.wheels) {
                 // The imported node is a wheel centre; Unity starts its suspension ray here.
                 wheel.center=new Vector3(0,.11f,0);
                 var f=wheel.forwardFriction;f.extremumSlip=.35f;f.extremumValue=1.15f;f.asymptoteSlip=.85f;f.asymptoteValue=.8f;wheel.forwardFriction=f;
                 f=wheel.sidewaysFriction;f.extremumSlip=.22f;f.extremumValue=1.15f;f.asymptoteSlip=.7f;f.asymptoteValue=.85f;wheel.sidewaysFriction=f;
             }
-            gameObject.AddComponent<VehicleSound>();
+            Sound = gameObject.AddComponent<VehicleSound>();
             gameObject.AddComponent<VehicleEffects>();
         }
         void FixedUpdate()
         {
             age+=Time.fixedDeltaTime;blinkClock+=Time.fixedDeltaTime;
-            var input=Controls;float dt=Time.fixedDeltaTime;
+            var input=rig ? rig.Controls : RigSample.Held;float dt=Time.fixedDeltaTime;
             float forwardSpeed=Vector3.Dot(Body.linearVelocity,transform.forward);
             Speed=Mathf.Abs(forwardSpeed)*3.6f;TopSpeed=Mathf.Max(TopSpeed,Speed);
             Vector3 rawAcceleration=transform.InverseTransformDirection((Body.linearVelocity-previousVelocity)/dt);
             Acceleration=Vector3.Lerp(Acceleration,Vector3.ClampMagnitude(rawAcceleration,18),1-Mathf.Exp(-8*dt));
             previousVelocity=Body.linearVelocity;
-            bool isKeyboardMode = (!rig || !rig.Connected);
+            bool isKeyboardMode = KeyboardDriving || !rig;
             bool holding = Locked || (!isKeyboardMode && (Wrecked || rig.Held || !rig.Connected));
             if (isKeyboardMode)
             {
                 if (Locked)
                 {
                     input = RigSample.Held;
+                    input.headlights = keyboardHeadlights;
                 }
                 else
                 {
@@ -174,19 +180,37 @@ namespace SimRacing
                         brake = brk,
                         steer = smoothKeyboardSteer,
                         clutch = 0f,
-                        gear = g
+                        gear = g,
+                        headlights = keyboardHeadlights
                     };
                     EngineRunning = true;
                 }
+                keyboardSample = input;
             }
             else if (holding) input = RigSample.Held;
             Gear = input.gear;
-            if (!isKeyboardMode && (!input.ignition || Fuel <= 0 || Wrecked || holding)) EngineRunning = false;
-            else if (input.starter) EngineRunning = true;
+            if (!isKeyboardMode)
+            {
+                if (!input.ignition || Fuel <= 0 || Wrecked || holding)
+                {
+                    EngineRunning = false;
+                    if (input.starter && (Fuel <= 0 || Wrecked)) Sound?.TriggerMotorNoStart();
+                }
+                else if (input.starter) EngineRunning = true;
+            }
+            else
+            {
+                if (Fuel <= 0 || Wrecked)
+                {
+                    EngineRunning = false;
+                    if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) Sound?.TriggerMotorNoStart();
+                }
+            }
             float ratio=definition.ratios[Mathf.Clamp(Gear,0,definition.ratios.Length-1)];
             float engagement=1-input.clutch;
             float shaft=Mathf.Abs(forwardSpeed)/(2*Mathf.PI*definition.tireRadius)*60*Mathf.Abs(ratio)*definition.finalDrive;
-            float targetRPM=Gear==0 || engagement<.15f ? Mathf.Lerp(definition.idleRPM,definition.redlineRPM,input.throttle) : Mathf.Max(definition.idleRPM,shaft);
+            float throttleRPM=Mathf.Lerp(definition.idleRPM,definition.redlineRPM,input.throttle);
+            float targetRPM=Gear==0 || engagement<.15f ? throttleRPM : Mathf.Max(Mathf.Lerp(definition.idleRPM,throttleRPM,0.35f),shaft);
             RPM=Mathf.MoveTowards(RPM,EngineRunning?targetRPM:0,(EngineRunning?6500:1500)*dt);
             RPM=Mathf.Min(RPM,definition.redlineRPM);
             if(EngineRunning && !Refueling)Fuel=Mathf.Max(0,Fuel-(.015f+RPM/definition.redlineRPM*.045f*(.3f+input.throttle*.7f))*dt);
@@ -195,7 +219,7 @@ namespace SimRacing
             int driven=Mathf.Max(1,definition.drivenWheels.Count(x=>x));Grounded=false;
             if(track) { int nearest=track.Closest(transform.position);Offroad=Vector3.Distance(transform.position,track.Point(nearest))>track.roadHalfWidth+1; }
             float grip=Grip*(Offroad?.65f:1);
-            float curve=.6f+.4f*Mathf.Sin(Mathf.Clamp((RPM-1000)/7000*Mathf.PI,0,Mathf.PI));
+            float curve=Mathf.Max(0.75f,.6f+.4f*Mathf.Sin(Mathf.Clamp((RPM-1000)/7000*Mathf.PI,0,Mathf.PI)));
             float motor=EngineRunning&&!holding ? definition.torque*curve*ratio*definition.finalDrive*engagement*input.throttle*Mathf.Clamp(Health/100+.3f,.3f,1)/driven : 0;
             // Prevent selecting a direction against appreciable existing motion.
             if(Mathf.Abs(forwardSpeed)>2 && Mathf.Sign(motor)!=Mathf.Sign(forwardSpeed))motor=0;
@@ -246,12 +270,15 @@ namespace SimRacing
             if(definition.digitalSpeed)definition.digitalSpeed.text=Mathf.FloorToInt(Speed).ToString();
             if(definition.digitalGear)definition.digitalGear.text=Gear==0?"N":Gear==6?"R":Gear.ToString();
             foreach(var lamp in headlamps) {lamp.gameObject.SetActive(input.headlights>0);lamp.enabled=input.headlights>0;lamp.intensity=input.headlights==2?500:250;lamp.range=input.headlights==2?100:65;lamp.spotAngle=input.headlights==2?38:55;}
-            for(int i=0;i<wipers.Length;i++)wipers[i].localRotation=wiperRest[i]*Quaternion.Euler(0,0,input.wipers>0?Mathf.Sin(age*(input.wipers==2?7:4))*50:0);
             foreach(var label in statusLabels) {
                 if(label.name=="FuelDisplay")label.text=$"FUEL  {Fuel:0} L";
                 if(label.name=="EngineStatus")label.text=EngineRunning?"ENGINE RUNNING":"IGNITION OFF";
             }
             if(Input.GetKeyDown(KeyCode.Backspace))Recover(false);
+            if(KeyboardDriving) {
+                // Rig cockpits have their own light switch; keyboard drivers cycle the headlights here.
+                if(Input.GetKeyDown(KeyCode.H))keyboardHeadlights=(keyboardHeadlights+1)%3;
+            }
             bool nearStation = track && Vector3.Distance(transform.position, track.fuelStation) < 12f;
             bool stopped = Speed < 0.5f;
             if (nearStation && stopped)
@@ -281,12 +308,13 @@ namespace SimRacing
             Body.position=track.Point(i)+Vector3.Cross(Vector3.up,direction)*2.8f+Vector3.up*.45f;
             Body.rotation=Quaternion.LookRotation(direction);Body.linearVelocity=Vector3.zero;Body.angularVelocity=Vector3.zero;
             previousVelocity=Vector3.zero;Acceleration=Vector3.zero;Health=100;Fuel=Mathf.Max(Fuel,10);EngineRunning=false;
+            Sound?.ResetIgnitionState();
             Recoveries++;recoveryClock=Time.unscaledTime;age=0;rig?.Hold();OnRecovery?.Invoke();return true;
         }
         void OnCollisionEnter(Collision contact)
         {
             float damage=0;
-            bool isTraffic = contact.gameObject.GetComponentInParent<TrafficAgent>() != null;
+            bool isTraffic = contact.gameObject.GetComponentInParent<TrafficAgent>() != null || contact.gameObject.GetComponentInParent<RaceOpponent>() != null;
             foreach(var point in contact.contacts) {
                 bool road=point.normal.y>.6f; if(road && age<3)continue;
                 float closing=Mathf.Abs(Vector3.Dot(contact.relativeVelocity,point.normal));
@@ -299,11 +327,55 @@ namespace SimRacing
             damage=Mathf.Min(damage,25f);
             Health=Mathf.Max(0,Health-damage);
         }
+        private Renderer[] windshieldRenderers;
+
         public void SetCockpit(bool active)
         {
             if(definition.cockpit)definition.cockpit.gameObject.SetActive(active);
             if(definition.exterior)definition.exterior.gameObject.SetActive(true);
             foreach(var visual in definition.wheelVisuals)visual.gameObject.SetActive(!active);
+            SetWindshieldVisibility(!active);
+        }
+
+        private void SetWindshieldVisibility(bool visible)
+        {
+            if (windshieldRenderers == null && definition != null && definition.exterior != null)
+            {
+                var list = new System.Collections.Generic.List<Renderer>();
+                foreach (var r in definition.exterior.GetComponentsInChildren<Renderer>(true))
+                {
+                    string n = r.name.ToLowerInvariant();
+                    string m = (r.sharedMaterial != null ? r.sharedMaterial.name : "").ToLowerInvariant();
+
+                    if (n.Contains("light") || n.Contains("lamp") || n.Contains("bulb") || n.Contains("mirror") || n.Contains("plate") ||
+                        m.Contains("light") || m.Contains("lamp") || m.Contains("bulb") || m.Contains("mirror") || m.Contains("plate"))
+                        continue;
+
+                    bool isGlass = n.Contains("windshiel") || n.Contains("frontglass") || n.Contains("sideglass") ||
+                                   n.Contains("window") || n.Contains("clearglass") || n.Contains("matteglass") ||
+                                   m.Contains("glass") || m.Contains("window");
+                    // The Bugatti cabin (pillars, tinted glass, old dash) and roof are opaque textured shells that sit
+                    // right in front of the driver's eye; the universal dashboard replaces them in cockpit view.
+                    bool isCabinShell = definition.id.Contains("bugatti") && (m.Contains("bugatti_diff") || m.Contains("meshpart21mtl") || n.StartsWith("meshpart29|"));
+
+                    if (isGlass || isCabinShell)
+                    {
+                        list.Add(r);
+                    }
+                }
+                windshieldRenderers = list.ToArray();
+            }
+
+            if (windshieldRenderers != null)
+            {
+                for (int i = 0; i < windshieldRenderers.Length; i++)
+                {
+                    if (windshieldRenderers[i] != null && windshieldRenderers[i].enabled != visible)
+                    {
+                        windshieldRenderers[i].enabled = visible;
+                    }
+                }
+            }
         }
     }
 }
