@@ -14,7 +14,13 @@ Game tự chạy khoảng 5 phút rồi tự thoát. Mở `SimRacing-Windows/Ver
 | --- | --- |
 | `random weather covers every preset` | 400 lần bốc thăm ra đủ Nắng / Mưa / Sương mù / Đêm |
 | `keyboard mode ignores rig pedals` | Ở chế độ bàn phím, đạp ga trên buồng lái không làm xe chạy |
-| `switching to rig mode waits for F9 takeover` | Đổi sang buồng lái thì xe bị khóa cho tới khi nhấn F9 |
+| `switching to rig mode waits for F9 takeover` | Đổi sang buồng lái thì xe bị khóa cho tới khi nhận xe (F9 hoặc nút ĐỀ) |
+| `settings screen reads the live cockpit` | Màn hình THIẾT LẬP đọc trực tiếp dữ liệu buồng lái (ảnh `01c-settings-cockpit.png`) |
+| `shifting without the clutch is refused` / `clutch pressed engages 1st gear` | Côn thực tế: không đạp côn thì không vào số |
+| `releasing the clutch against the brake stalls` / `engine restarts after a stall` | Chết máy khi phanh dừng mà còn số, đề lại được |
+| `START button on the cockpit takes over` | Phanh + N + nút ĐỀ trên buồng lái là nhận xe, không cần bàn phím |
+
+Các bài kiểm tra giao thức chạy khi build (`ProtocolVerification`) còn kiểm: chiều encoder (tick dương = trái), hiệu chỉnh bàn đạp đấu ngược hoặc hành trình ngắn, bảng cần số, hai công tắc số cùng chạm thì thành N.
 | `grid race spawns player and 5 AI racers` | Lưới xuất phát có 6 xe |
 | `AI racers drive away from the grid` / `stay upright` | Xe AI rời lưới, đi đúng mặt đường, không lật |
 | `standings rank the stationary player last` | Bảng xếp hạng đúng khi bạn đứng yên |
@@ -31,8 +37,9 @@ Game tự chạy khoảng 5 phút rồi tự thoát. Mở `SimRacing-Windows/Ver
    - W chạy, S phanh rồi lùi, A/D đánh lái. H bật đèn (tắt → cốt → pha). Xe không có gạt mưa.
 2. Đang lái, nhấn **F10**.
    - Hiện thông báo *Đã chuyển sang BUỒNG LÁI*. Xe bị khóa phanh, HUD báo *CHƯA KẾT NỐI BUỒNG LÁI* (nếu ESP32 chưa gửi) hoặc *BUỒNG LÁI TẠM KHÓA* (nếu đã kết nối). Phím W không còn tác dụng.
-3. Với buồng lái thật đã kết nối: về N, nhả ga, giữ phanh, nhấn **F9**, rồi đề máy, vào số và chạy.
-   - Vô lăng, bàn đạp, cần số điều khiển xe. Vô lăng có lực phản hồi.
+3. Với buồng lái thật đã kết nối (xem [HUONG_DAN_BUONG_LAI.md](HUONG_DAN_BUONG_LAI.md)): bật khóa điện, về N, nhả ga, giữ phanh, nhấn **nút ĐỀ** (hoặc F9), rồi đạp côn, vào số 1 và chạy.
+   - Vô lăng, bàn đạp, cần số điều khiển xe. Dòng dưới HUD hiện số, % ga/phanh/côn và % lái trực tiếp.
+   - Gạt số khi chưa đạp côn: HUD báo *KHÔNG VÀO ĐƯỢC SỐ*. Phanh dừng xe khi còn số mà không đạp côn: *CHẾT MÁY*.
 4. Nhấn **Esc** → nút *Điều khiển: … ⇄ Đổi (F10)* → đổi lại **Bàn phím** → Tiếp tục.
    - Xe lái được ngay bằng bàn phím, vô lăng thật hết lực phản hồi.
 5. Thoát game rồi mở lại: lựa chọn điều khiển lần cuối vẫn được giữ.

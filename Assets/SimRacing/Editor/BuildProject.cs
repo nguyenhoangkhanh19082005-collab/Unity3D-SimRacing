@@ -98,6 +98,9 @@ namespace SimRacing.Editor
             var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions{scenes=new[]{"Assets/Scenes/SimRacing.unity"},locationPathName=exe,target=BuildTarget.StandaloneWindows64,options=BuildOptions.None});
             if(report.summary.result!=BuildResult.Succeeded)throw new Exception("Build failed: "+report.summary.result);
             CopyRuntimeData(Path.Combine(GameFolder,"SimRacing_Data"));
+            // Cockpit network setup (firewall UDP 9999 + PC address 192.168.1.100) ships next to the exe.
+            File.Copy("Tools/Thiet_Lap_Mang_Buong_Lai.ps1",Path.Combine(GameFolder,"Thiet_Lap_Mang_Buong_Lai.ps1"),true);
+            File.Copy("Thiet_Lap_Mang_Buong_Lai.bat",Path.Combine(GameFolder,"Thiet_Lap_Mang_Buong_Lai.bat"),true);
             // Unity's debug-symbol folders must not ship
             foreach(string folder in Directory.GetDirectories(GameFolder))
                 if(folder.EndsWith("_DoNotShip")||folder.EndsWith("_ButDontShipItWithYourGame"))Directory.Delete(folder,true);

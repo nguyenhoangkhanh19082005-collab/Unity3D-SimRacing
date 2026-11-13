@@ -1,5 +1,7 @@
 # Bộ firmware SimRacing: S3 Control Box + WROOM32 Touchscreen
 
+**Cập nhật 13/11/2026 (fix2):** gửi broadcast tới khi game trả lời rồi gửi thẳng tới IP của game, nhận phản hồi từ mọi máy trong 192.168.1.x, tự dò lại MCP23017 mỗi giây (thử cả SDA/SCL đảo), bỏ qua lỗi I2C đơn lẻ. Hướng dẫn vận hành: `HUONG_DAN_BUONG_LAI.md` ở gốc repo.
+
 **Cập nhật 13/10/2026:** đã sửa watchdog khi W5500/socket chưa khởi tạo và nạp thử S3. Xem [kết quả đo và các điểm phải sửa trên sơ đồ](../docs/SUA_LOI_DAU_NOI_S3.md). Log chẩn đoán hiện xuất qua UART0/CH343 115200; motor vẫn khóa.
 
 Bộ này tích hợp với **game Godot trong `simracing_game_native`** và sơ đồ `mạch esp32-control box.png`. Màn hình dựa trên firmware thử đã chạy của bạn và cấu hình TFT_eSPI đọc trực tiếp trên máy. Bản web trong `simracing_game_3d` là bản cũ có quy ước 6 số tiến/7=lùi khác; không chạy Node server cùng game Godot vì cùng chiếm UDP 9999. Không dùng firmware sample cũ để điều khiển motor.
@@ -40,7 +42,7 @@ S3 là nơi duy nhất đọc/chuẩn hóa phần cứng và điều khiển dri
 | Wipers GPB3/GPB4 | Công tắc OFF / SLOW / FAST | Hai cần gạt chuyển động; tắt thì về vị trí nghỉ |
 | Horn GPB5 | Nhấn giữ, nhả là tắt | Còi vòng lặp 350 + 440 Hz |
 | Xi-nhan GPB6/GPB7 | Công tắc trái / giữa / phải duy trì | Trạng thái theo công tắc; không tự hủy bằng game khi dùng rig |
-| Joystick X/Y / nút GPIO21 | Nhìn quanh / nhấn đổi camera một lần | 4 góc camera; không lặp khi giữ nút |
+| Joystick X/Y / nút GPIO17 | Nhìn quanh / nhấn đổi camera một lần | 4 góc camera; không lặp khi giữ nút |
 
 Chống dội 20 ms; đọc đầu vào mỗi 5 ms; UDP 100 Hz; màn hình nhận 20 Hz và vẽ 10 Hz. Gạt mưa là mô hình hình học trong cockpit, chưa mô phỏng nước bị quét khỏi kính. Nhiệt độ nước 90 °C vẫn là giá trị mô phỏng của game, không phải cảm biến nhiệt thật. ABS/TCS chưa được game tính nên không tạo cờ giả.
 
@@ -49,9 +51,9 @@ Chống dội 20 ms; đọc đầu vào mỗi 5 ms; UDP 100 Hz; màn hình nhậ
 | Chức năng | GPIO S3 | Ghi chú |
 |---|---:|---|
 | Côn PR1 / phanh PR2 / ga PR3 | 1 / 2 / 3 | Hai đầu biến trở 3V3 và GND; con chạy vào ADC |
-| Joystick X / Y / nhấn | 4 / 5 / 21 | Nút nhấn kéo xuống GND |
+| Joystick X / Y / nhấn | 4 / 5 / 17 | Nút nhấn kéo xuống GND |
 | Encoder A / B | 15 / 16 | Phải là tín hiệu logic tối đa 3,3 V |
-| MCP23017 SDA / SCL | 8 / 18 | I2C 100 kHz, địa chỉ 0x20 |
+| MCP23017 SDA / SCL | 18 / 8 | I2C 100 kHz, địa chỉ 0x20 |
 | W5500 MOSI / MISO / SCK | 11 / 13 / 12 | Kế thừa mapping firmware mẫu, cần kiểm tra nhãn module |
 | W5500 CS / RESET / INT | 10 / 14 / 9 | INT hiện không dùng, firmware polling |
 | BTS7960 RPWM / LPWM | 6 / 7 | PWM 20 kHz, 8 bit |
@@ -62,7 +64,7 @@ Chống dội 20 ms; đọc đầu vào mỗi 5 ms; UDP 100 Hz; màn hình nhậ
 
 ### MCP23017 và giắc control box
 
-VDD pin 9 = 3V3, VSS pin 10 = GND, A0/A1/A2 xuống GND. SCL pin 12 -> GPIO18; SDA pin 13 -> GPIO8. **RESET# pin 18 phải kéo lên 3V3 bằng khoảng 10 kΩ**; ảnh hiện đánh dấu không nối. Thêm pull-up SDA/SCL khoảng 4,7 kΩ lên 3V3 nếu module chưa có, tụ 100 nF sát VDD/VSS. GPIO input dùng pull-up, công tắc đóng xuống GND; không đưa 5/12 V vào GPA/GPB.
+VDD pin 9 = 3V3, VSS pin 10 = GND, A0/A1/A2 xuống GND. SCL pin 12 -> GPIO8; SDA pin 13 -> GPIO18 (đúng sơ đồ và Config.h). **RESET# pin 18 phải kéo lên 3V3 bằng khoảng 10 kΩ**; ảnh hiện đánh dấu không nối. Thêm pull-up SDA/SCL khoảng 4,7 kΩ lên 3V3 nếu module chưa có, tụ 100 nF sát VDD/VSS. GPIO input dùng pull-up, công tắc đóng xuống GND; không đưa 5/12 V vào GPA/GPB.
 
 | MCP23017 | Thiết bị | Bit trong buttons_mask |
 |---|---|---:|

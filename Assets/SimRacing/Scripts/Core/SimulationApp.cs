@@ -216,7 +216,7 @@ namespace SimRacing
             {
                 if (ScreenState == "drive") Pause();
                 else if (ScreenState == "pause") Resume();
-                else if (ScreenState == "settings") ScreenState = "menu";
+                else if (ScreenState == "settings") { Rig.CancelCalibration(); ScreenState = "menu"; }
             }
         }
 
@@ -228,7 +228,7 @@ namespace SimRacing
             if (Car) Car.KeyboardDriving = mode == ControlMode.Keyboard;
             if (Session) Session.ShowNotice(mode == ControlMode.Keyboard
                 ? "Đã chuyển sang BÀN PHÍM · W/S ga-phanh, A/D lái"
-                : "Đã chuyển sang BUỒNG LÁI · Về N, nhả ga, giữ phanh rồi nhấn F9");
+                : "Đã chuyển sang BUỒNG LÁI · Về N, nhả ga, giữ phanh rồi nhấn nút ĐỀ (hoặc F9)");
             if (!TestMode) SavePreferences();
         }
 

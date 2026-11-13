@@ -27,6 +27,14 @@ namespace SimRacing
             if(app.Rig.Port==9999){Debug.LogError("Verification refuses hardware port 9999");Application.Quit(2);yield break;}
             directory=Path.Combine(Application.dataPath,"..","Verification");Directory.CreateDirectory(directory);
             yield return new WaitForSecondsRealtime(2);yield return Capture("01-menu.png");
+            // Settings screen with a live cockpit: diagnostics and the three calibration wizards
+            var menu=FindFirstObjectByType<SimulationMenuCanvas>();
+            sender=new UdpClient();sender.Connect(IPAddress.Loopback,app.Rig.Port);sending=true;gear=2;
+            app.ScreenState="settings";menu?.UpdateVisibility();yield return new WaitForSecondsRealtime(.6f);
+            Check(app.Rig.Connected && app.Rig.Raw.switchGear==2 && app.Rig.Raw.gear==2,"settings screen reads the live cockpit");
+            yield return Capture("01c-settings-cockpit.png");
+            sending=false;sender.Close();sender=null;gear=0;app.ScreenState="menu";menu?.UpdateVisibility();
+            yield return new WaitForSecondsRealtime(.5f);
             app.Mode="versus";yield return new WaitForSecondsRealtime(.5f);yield return Capture("01b-menu-versus.png");
             // Random weather draws every preset over many trials
             var seen=new HashSet<string>();for(int i=0;i<400;i++)seen.Add(SimulationApp.PickRandomWeather());
@@ -42,18 +50,29 @@ namespace SimRacing
             app.Rig.SendMessage("OnApplicationFocus",true);Check(app.Rig.Resume(),"neutral + brake explicitly resumes");
             yield return new WaitForSecondsRealtime(3.5f);Check(app.Session.Active,"countdown starts session");
             flags=3;yield return new WaitForSecondsRealtime(.5f);flags=1;Check(app.Car.EngineRunning,"ignition and starter start engine");
-            Vector3 origin=app.Car.transform.position;brake=0;clutch=0;gear=1;throttle=1600;
+            // Manual gearbox: moving the lever into 1st with the clutch up is refused (the box stays in N)
+            clutch=0;gear=1;yield return new WaitForSecondsRealtime(.3f);
+            Check(app.Car.Gear==0 && app.Car.Hint!="" && app.Car.EngineRunning,"shifting without the clutch is refused");
+            // Real launch: clutch down, 1st gear, then clutch up with throttle
+            clutch=4095;yield return new WaitForSecondsRealtime(.3f);Check(app.Car.Gear==1,"clutch pressed engages 1st gear");
+            Vector3 origin=app.Car.transform.position;brake=0;clutch=0;throttle=1600;
             yield return new WaitForSecondsRealtime(4);
             Debug.Log($"[SPEED CHECK] Speed={app.Car.Speed:F3} dist={Vector3.Distance(origin,app.Car.transform.position):F3} RPM={app.Car.RPM:F1} motorTorque={app.Car.definition.torque}");
             Check(app.Car.Speed>5,"manual first gear accelerates");Check(Vector3.Distance(origin,app.Car.transform.position)>3,"vehicle moves along road");
             yield return Capture("03-driving.png");
             throttle=0;brake=4095;clutch=4095;gear=0;
             yield return new WaitForSecondsRealtime(4);Check(app.Car.Speed<1,"brake stops car");
-            brake=0;clutch=0;gear=6;throttle=1000;yield return new WaitForSecondsRealtime(1.3f);
+            gear=6;yield return new WaitForSecondsRealtime(.3f);
+            brake=0;clutch=0;throttle=1000;yield return new WaitForSecondsRealtime(1.3f);
             float revDot = Vector3.Dot(app.Car.Body.linearVelocity,app.Car.transform.forward);
             Debug.Log($"[REVERSE CHECK] revDot={revDot:F3} Speed={app.Car.Speed:F3} vel={app.Car.Body.linearVelocity}");
             Check(revDot<-.5f,"reverse gear moves backward");
             throttle=0;brake=clutch=4095;gear=0;yield return new WaitForSecondsRealtime(2);
+            // Stall: 1st gear engaged, clutch released while the brake holds the car still
+            gear=1;yield return new WaitForSecondsRealtime(.3f);clutch=0;yield return new WaitForSecondsRealtime(1.5f);
+            Check(!app.Car.EngineRunning && app.Car.Hint!="","releasing the clutch against the brake stalls");
+            clutch=4095;gear=0;yield return new WaitForSecondsRealtime(.2f);flags=3;yield return new WaitForSecondsRealtime(.4f);flags=1;
+            Check(app.Car.EngineRunning,"engine restarts after a stall");
             sending=false;yield return new WaitForSecondsRealtime(.4f);Check(!app.Rig.Connected && app.Rig.Held,"timeout holds rig");
             sending=true;yield return new WaitForSecondsRealtime(.3f);Check(app.Rig.Held,"reconnection does not auto resume");
             app.Rig.SendMessage("OnApplicationFocus",true);Check(app.Rig.Resume(),"explicit resume after timeout");
@@ -67,6 +86,9 @@ namespace SimRacing
             Check(app.Car.Recover(false),"stationary recovery");Check(app.Car.Recoveries==1 && app.Rig.Held,"recovery invalidates attempt and holds rig");
             // Control modes: the keyboard mode must ignore a live rig, and switching back to the rig waits for F9
             yield return new WaitForSecondsRealtime(2.1f);
+            // Taking the car back from the cockpit itself: brake held, neutral, press START
+            flags=3;yield return new WaitForSecondsRealtime(.3f);flags=1;
+            Check(!app.Rig.Held && app.Car.EngineRunning,"START button on the cockpit takes over");
             app.SetControl(ControlMode.Keyboard);flags=1;gear=1;clutch=0;brake=0;throttle=4095;
             yield return new WaitForSecondsRealtime(1.5f);
             Check(app.Car.KeyboardDriving && app.Rig.Held && app.Car.Speed<3,"keyboard mode ignores rig pedals");
@@ -238,14 +260,14 @@ namespace SimRacing
             app.Rig.SendMessage("OnApplicationFocus",true);
             Debug.Log($"[CAREER READY] held={app.Rig.Held} connected={app.Rig.Connected} ready={app.Rig.Raw.Ready} paused={app.Rig.Paused} speed={app.Car.Speed} brake={app.Rig.Raw.brake} throttle={app.Rig.Raw.throttle} gear={app.Rig.Raw.gear} starter={app.Rig.Raw.starter}");
             bool takeover=app.Rig.Resume();Check(takeover,"career safe takeover");if(!takeover){sending=false;yield break;}
-            yield return new WaitForSecondsRealtime(3.5f);flags=3;yield return new WaitForSecondsRealtime(.3f);flags=1;gear=1;clutch=0;
+            yield return new WaitForSecondsRealtime(3.5f);flags=3;yield return new WaitForSecondsRealtime(.3f);flags=1;clutch=4095;gear=1;yield return new WaitForSecondsRealtime(.3f);clutch=0;
             float timeout=Time.unscaledTime+75;
             while(!app.Session.Finished && Time.unscaledTime<timeout) {
                 int nearest=app.Track.Closest(app.Car.transform.position);Vector3 next=app.Track.Point(nearest+2),forward=(app.Track.Point(nearest+3)-next).normalized;
                 Vector3 target=next+Vector3.Cross(Vector3.up,forward)*2.8f;
                 var local=app.Car.transform.InverseTransformPoint(target);
                 float angle=Mathf.Atan2(local.x,Mathf.Max(1,local.z));float roadWheel=Mathf.Atan2(2*2.82f*Mathf.Sin(angle),Mathf.Max(4,local.magnitude))*Mathf.Rad2Deg;
-                encoder=Mathf.RoundToInt(Mathf.Clamp(roadWheel/Mathf.Lerp(31.5f,7,app.Car.Speed/220),-1,1)*8000);
+                encoder=Mathf.RoundToInt(Mathf.Clamp(roadWheel/Mathf.Lerp(31.5f,7,app.Car.Speed/220),-1,1)*-app.Rig.calibration.steeringHalfRangeTicks);
                 float wanted=Mathf.Min(28,app.Session.Remaining*1.8f);if(app.Session.Remaining<1.8f)wanted=0;
                 float error=wanted-app.Car.Speed;throttle=Mathf.RoundToInt(Mathf.Clamp01(error*.075f)*4095);brake=Mathf.RoundToInt(Mathf.Clamp01(-error*.16f)*4095);
                 if(wanted==0){brake=4095;clutch=4095;gear=0;}

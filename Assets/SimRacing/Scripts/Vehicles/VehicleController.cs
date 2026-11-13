@@ -32,6 +32,13 @@ namespace SimRacing
         int keyboardHeadlights;
         Light[] headlamps;
         TextMesh[] statusLabels;
+        // Manual gearbox driven by the cockpit's H-shifter and clutch pedal.
+        int engagedGear;
+        float stallClock, hintUntil;
+        string hint = "";
+        /// <summary>Short driving tip for the HUD (missed shift, stall, start conditions); empty when none.</summary>
+        public string Hint => Time.time < hintUntil ? hint : "";
+        void ShowHint(string text, float seconds = 2.5f) { hint = text; hintUntil = Time.time + seconds; }
         public bool Blink => blinkClock % 1 < .5f;
         /// <summary>Set by SimulationApp from the chosen control mode; false means the physical rig drives the car.</summary>
         public bool KeyboardDriving = true;
@@ -188,15 +195,22 @@ namespace SimRacing
                 keyboardSample = input;
             }
             else if (holding) input = RigSample.Held;
-            Gear = input.gear;
+            bool manualClutch = !isKeyboardMode && rig.calibration.manualClutch;
+            Gear = isKeyboardMode ? input.gear : ShiftCockpit(input, forwardSpeed, manualClutch);
             if (!isKeyboardMode)
             {
                 if (!input.ignition || Fuel <= 0 || Wrecked || holding)
                 {
                     EngineRunning = false;
                     if (input.starter && (Fuel <= 0 || Wrecked)) Sound?.TriggerMotorNoStart();
+                    else if (input.starter && !input.ignition && !holding) ShowHint("Bật KHÓA ĐIỆN (Ignition) trước rồi mới nhấn ĐỀ");
                 }
-                else if (input.starter) EngineRunning = true;
+                else if (input.starter && !EngineRunning)
+                {
+                    // Like a real manual car: crank only in neutral or with the clutch pressed.
+                    if (manualClutch && Gear != 0 && input.clutch < .6f) ShowHint("Đạp hết CÔN (hoặc về số N) rồi mới đề máy");
+                    else { EngineRunning = true; stallClock = 0; }
+                }
             }
             else
             {
@@ -208,6 +222,14 @@ namespace SimRacing
             }
             float ratio=definition.ratios[Mathf.Clamp(Gear,0,definition.ratios.Length-1)];
             float engagement=1-input.clutch;
+            // Stall: wheels held almost still with a gear engaged and the clutch up (braking to a stop in gear,
+            // or trying to pull away in 3rd-5th without gas).
+            if(manualClutch && EngineRunning && !holding && Gear!=0 && engagement>.85f && Speed<2.5f
+               && (input.brake>.25f || (Gear>=3 && Gear<=5 && input.throttle<.5f))) stallClock+=dt; else stallClock=0;
+            if(stallClock>.7f) { EngineRunning=false; stallClock=0; ShowHint("CHẾT MÁY • Đạp côn (hoặc về N) rồi nhấn ĐỀ để nổ máy lại", 4); }
+            // Idle creep: in 1st or reverse with the clutch up and no brake, an idling engine moves the car slowly.
+            float drive=input.throttle;
+            if(manualClutch && EngineRunning && (Gear==1 || Gear==6) && Speed<6 && input.brake<.1f) drive=Mathf.Max(drive,.1f);
             float shaft=Mathf.Abs(forwardSpeed)/(2*Mathf.PI*definition.tireRadius)*60*Mathf.Abs(ratio)*definition.finalDrive;
             float throttleRPM=Mathf.Lerp(definition.idleRPM,definition.redlineRPM,input.throttle);
             float targetRPM=Gear==0 || engagement<.15f ? throttleRPM : Mathf.Max(Mathf.Lerp(definition.idleRPM,throttleRPM,0.35f),shaft);
@@ -220,7 +242,7 @@ namespace SimRacing
             if(track) { int nearest=track.Closest(transform.position);Offroad=Vector3.Distance(transform.position,track.Point(nearest))>track.roadHalfWidth+1; }
             float grip=Grip*(Offroad?.65f:1);
             float curve=Mathf.Max(0.75f,.6f+.4f*Mathf.Sin(Mathf.Clamp((RPM-1000)/7000*Mathf.PI,0,Mathf.PI)));
-            float motor=EngineRunning&&!holding ? definition.torque*curve*ratio*definition.finalDrive*engagement*input.throttle*Mathf.Clamp(Health/100+.3f,.3f,1)/driven : 0;
+            float motor=EngineRunning&&!holding ? definition.torque*curve*ratio*definition.finalDrive*engagement*drive*Mathf.Clamp(Health/100+.3f,.3f,1)/driven : 0;
             // Prevent selecting a direction against appreciable existing motion.
             if(Mathf.Abs(forwardSpeed)>2 && Mathf.Sign(motor)!=Mathf.Sign(forwardSpeed))motor=0;
             for(int i=0;i<definition.wheels.Length;i++) {
@@ -228,7 +250,7 @@ namespace SimRacing
                 wheel.steerAngle=wheel.transform.localPosition.z>0?Steering:0;
                 wheel.motorTorque=definition.drivenWheels[i]?motor:0;
                 wheel.brakeTorque=(holding?1:input.brake)*definition.mass*1.65f;
-                if(EngineRunning && Gear!=0 && input.throttle<.02f)wheel.brakeTorque+=engagement*40;
+                if(EngineRunning && Gear!=0 && drive<.02f)wheel.brakeTorque+=engagement*40;
                 var f=wheel.forwardFriction;f.stiffness=grip;wheel.forwardFriction=f;
                 f=wheel.sidewaysFriction;f.stiffness=grip;wheel.sidewaysFriction=f;
                 Grounded |= wheel.isGrounded;
@@ -256,6 +278,19 @@ namespace SimRacing
                 float rumble=Offroad && Speed>10 ? Mathf.Sin(age*40)*160 : 0;
                 rig.SendFeedback(Mathf.Clamp(lateral*45-input.steer*200+rumble,-1000,1000),Speed,RPM,Gear,Fuel/60*100,EngineRunning,Blink,Mathf.Abs(rumble));
             }
+        }
+        /// <summary>H-shifter lever position (input.gear) to the gear actually engaged. With the manual clutch
+        /// option a running engine only takes a gear while the clutch is pressed; otherwise the box stays in N.</summary>
+        int ShiftCockpit(RigSample input, float forwardSpeed, bool manualClutch)
+        {
+            int lever = input.gear;
+            if (lever == 0) { engagedGear = 0; return 0; }
+            if (lever == engagedGear) return engagedGear;
+            if (lever == 6 && forwardSpeed > 1f) { engagedGear = 0; ShowHint("Dừng hẳn xe rồi mới vào số lùi (R)"); return 0; }
+            if (!manualClutch || !EngineRunning || input.clutch >= .6f) { engagedGear = lever; return lever; }
+            engagedGear = 0;
+            ShowHint($"KHÔNG VÀO ĐƯỢC SỐ {RigProtocol.GearName(lever)} • Đạp hết côn khi sang số");
+            return 0;
         }
         void Update()
         {

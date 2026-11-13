@@ -28,3 +28,4 @@ __pycache__/
 /SimRacing-Windows/Verification/
 /SimRacing-Windows/*_DoNotShip/
 /SimRacing-Windows/*_ButDontShipItWithYourGame/
+!Thiet_Lap_Mang_Buong_Lai.ps1

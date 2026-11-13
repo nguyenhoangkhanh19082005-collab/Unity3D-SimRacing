@@ -21,7 +21,7 @@ Nếu Git báo `Filename too long`, hãy clone vào một thư mục có đườ
 
 > Không dùng nút **Code → Download ZIP** của GitHub: file ZIP đó chỉ chứa "con trỏ" Git LFS chứ không chứa game. Nếu `Chay_SimRacing_Unity.bat` báo *chưa được tải đầy đủ*, chạy `git lfs install` rồi `git lfs pull` trong thư mục repo.
 
-Cách chơi, phím điều khiển và cách kết nối buồng lái: xem [HUONG_DAN.md](HUONG_DAN.md). Danh sách kiểm nghiệm: [KIEM_NGHIEM.md](KIEM_NGHIEM.md). Firmware buồng lái: `Hardware/firmware-Arduino IDE`.
+Cách chơi và phím điều khiển: xem [HUONG_DAN.md](HUONG_DAN.md). **Lái bằng buồng lái thật** (mạng, firmware, hiệu chỉnh vô lăng/bàn đạp/cần số, xử lý lỗi): [HUONG_DAN_BUONG_LAI.md](HUONG_DAN_BUONG_LAI.md); trên mỗi máy chạy `Thiet_Lap_Mang_Buong_Lai.bat` một lần. Danh sách kiểm nghiệm: [KIEM_NGHIEM.md](KIEM_NGHIEM.md). Firmware buồng lái: `Hardware/firmware-Arduino IDE`.
 
 ## Dành cho người phát triển
 

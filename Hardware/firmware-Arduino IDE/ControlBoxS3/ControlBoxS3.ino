@@ -16,6 +16,11 @@
 HardwareSerial dash(1);
 EthernetUDP udp;
 IPAddress localIP(192,168,1,150), pcIP(192,168,1,100), subnet(255,255,255,0);
+// Until the game answers, input packets go to the limited broadcast address so the PC
+// receives them whatever its exact address is. The first feedback packet tells us the
+// game's real IP; from then on packets are unicast to it (back to broadcast after 1 s of silence).
+IPAddress broadcastIP(255,255,255,255), gameIP(192,168,1,100);
+bool gameKnown=false;
 byte mac[]={0x02,0x53,0x49,0x4d,0x00,0x01};
 Rig::Input input;
 Rig::Feedback feedback;
@@ -30,13 +35,17 @@ bool ethernetReady=false, udpReady=false;
 RTC_DATA_ATTR uint32_t lastStage=0;
 enum : uint32_t { ST_BOOT=1, ST_ETH_INIT, ST_UDP_INIT, ST_LINK, ST_UART_RX, ST_UDP_RX, ST_INPUT, ST_MOTOR, ST_UDP_TX, ST_UART_TX, ST_IDLE };
 uint32_t txOK=0,txFailed=0;
-uint8_t w5500Version=0, i2cAckMask=0;
+uint8_t w5500Version=0, i2cAckMask=0, mcpAddr=0x20, mcpFailures=0;
+uint32_t mcpRetryAt=0;
+int activeSDA=I2C_SDA, activeSCL=I2C_SCL;
 bool hazard=false, haveFeedback=false, haveHeartbeat=false, haveCommand=false;
 uint32_t lastFeedback=0,lastHeartbeat=0,lastCommandTime=0,starterUntil=0;
 uint16_t lastCommand=0, dashSequence=0, stableSwitches=0;
 uint8_t commandResult=0;
 int applied=0;
 uint16_t rawThrottle=0,rawBrake=0,rawClutch=0;
+uint8_t fallbackGear=0;
+int8_t prevJoyShift=0;
 
 void IRAM_ATTR encoderISR() {
   uint8_t state=(digitalRead(ENCODER_A)<<1)|digitalRead(ENCODER_B);
@@ -55,16 +64,39 @@ void motorOff() {
 }
 void disarm() { armed=false; motorOff(); }
 bool writeMCP(uint8_t reg,uint8_t value) {
-  Wire.beginTransmission(0x20); Wire.write(reg); Wire.write(value); return Wire.endTransmission()==0;
+  Wire.beginTransmission(mcpAddr); Wire.write(reg); Wire.write(value); return Wire.endTransmission()==0;
 }
 bool initMCP() {
   // BANK=0 after power/reset. IOCON sequential mode + all inputs/pullups.
   return writeMCP(0x0a,0) && writeMCP(0,255) && writeMCP(1,255) && writeMCP(0x0c,255) && writeMCP(0x0d,255);
 }
 bool readMCP(uint16_t &value) {
-  Wire.beginTransmission(0x20); Wire.write(0x12);
-  if(Wire.endTransmission(false)!=0 || Wire.requestFrom(uint8_t(0x20),uint8_t(2))!=2) return false;
+  Wire.beginTransmission(mcpAddr); Wire.write(0x12);
+  if(Wire.endTransmission(false)!=0 || Wire.requestFrom(mcpAddr,uint8_t(2))!=2) return false;
   uint16_t raw=Wire.read(); raw|=uint16_t(Wire.read())<<8; value=uint16_t(~raw); return true;
+}
+// Looks for the MCP23017 (0x20..0x27) on the given pins. Never call pinMode() after
+// Wire.begin(): on arduino-esp32 3.x that detaches the pins from the I2C peripheral.
+bool probeI2C(int sda, int scl) {
+  Wire.end();
+  Wire.begin(sda, scl, 100000); Wire.setTimeOut(5);
+  uint8_t mask=0, firstFound=0;
+  for(uint8_t addr=0x20; addr<=0x27; addr++) {
+    Wire.beginTransmission(addr);
+    if(Wire.endTransmission()==0) { mask|=1<<(addr-0x20); if(!firstFound) firstFound=addr; }
+  }
+  i2cAckMask=mask;
+  if(!mask) return false;
+  activeSDA=sda; activeSCL=scl; mcpAddr=firstFound;
+  mcpOK=initMCP(); mcpFailures=0;
+  return mcpOK;
+}
+// Tries the configured pins first, then the swapped pair (a common wiring mistake).
+bool findMCP() {
+  if(probeI2C(I2C_SDA,I2C_SCL)) return true;
+  if(probeI2C(I2C_SCL,I2C_SDA)) { Serial0.printf("[RIG] CANH BAO: MCP23017 chi tra loi khi DAO SDA/SCL (SDA=%d SCL=%d). Sua Config.h hoac day.\n",I2C_SCL,I2C_SDA); return true; }
+  probeI2C(I2C_SDA,I2C_SCL);
+  return false;
 }
 uint16_t pedal(int raw,int released,int pressed,uint16_t old) {
   int normalized=constrain((raw-released)*4095/(pressed-released),0,4095);
@@ -77,7 +109,7 @@ void command(uint8_t cmd,uint32_t now) {
   switch(cmd) {
     case Rig::STOP: disarm(); break;
     case Rig::START:
-      if(mcpOK && (stableSwitches&(1<<6))) starterUntil=now+250;
+      if(!mcpOK || (stableSwitches&(1<<6))) starterUntil=now+250;
       else commandResult=1;
       break;
     case Rig::HAZARD: hazard=!hazard; break;
@@ -113,24 +145,31 @@ void readFeedback(uint32_t now) {
   if(!ethernetReady || !udpReady || !ethernetOK) return;
   for(int i=0;i<4;i++) {
     int size=udp.parsePacket(); if(size<=0) break;
-    if(size!=sizeof(Rig::Feedback) || udp.remoteIP()!=pcIP || udp.remotePort()!=9999) { udp.flush(); continue; }
+    IPAddress from=udp.remoteIP();
+    // Accept the game from any address on our /24 (the W5500 has no gateway, so it could not answer anyone else).
+    bool sameSubnet=from[0]==localIP[0] && from[1]==localIP[1] && from[2]==localIP[2] && from[3]!=localIP[3];
+    if(size!=sizeof(Rig::Feedback) || !sameSubnet || udp.remotePort()!=9999) { udp.flush(); continue; }
     Rig::Feedback candidate;
     if(udp.read(reinterpret_cast<uint8_t*>(&candidate),sizeof(candidate))!=sizeof(candidate)) continue;
     if(candidate.magic!=0x4642 || candidate.torque < -1000 || candidate.torque>1000 || candidate.gear>6 || candidate.fuel>100 || candidate.rpm>20000) continue;
     if(gameAlive(now) && !Rig::newer(candidate.sequence,feedback.sequence)) continue;
     feedback=candidate; haveFeedback=true; lastFeedback=now;
+    if(!gameKnown || gameIP!=from) Serial0.printf("[RIG] Game found at %u.%u.%u.%u\n",from[0],from[1],from[2],from[3]);
+    gameIP=from; gameKnown=true;
   }
 }
 void scanInputs(uint32_t now) {
   uint16_t raw=0;
-  bool valid=readMCP(raw);
-  if(!valid) {
-    mcpOK=false; stableSwitches=0; hazard=false; starterUntil=0; disarm();
+  bool valid=false;
+  if(mcpOK) {
+    // One glitched I2C read must not drop the shifter: give up only after 3 failures in a row.
+    if(readMCP(raw)) { valid=true; mcpFailures=0; }
+    else if(++mcpFailures>=3) { mcpOK=false; Serial0.println("[RIG] MCP23017 mat ket noi -> che do du phong (joystick doi so)"); }
+  }
+  if(!mcpOK) {
+    stableSwitches=0; disarm();
     for(auto &button:switches) button=Rig::Debouncer();
-  } else if(!mcpOK) {
-    // Re-enable pullups after a peripheral reset/brownout; next scan reads it.
-    mcpOK=initMCP();
-  } else {
+  } else if(valid) {
     for(int i=0;i<16;i++) {
       bool changed=switches[i].update(raw&(1<<i),now);
       if(switches[i].stable) stableSwitches|=1<<i; else stableSwitches&=~(1<<i);
@@ -142,19 +181,47 @@ void scanInputs(uint32_t now) {
   input.throttle=pedal(rawThrottle,THROTTLE_RELEASED,THROTTLE_PRESSED,input.throttle);
   input.brake=pedal(rawBrake,BRAKE_RELEASED,BRAKE_PRESSED,input.brake);
   input.clutch=pedal(rawClutch,CLUTCH_RELEASED,CLUTCH_PRESSED,input.clutch);
-  input.gear=Rig::decodeGear(stableSwitches);
-  uint16_t gearBits=stableSwitches&63;
-  input.reserved[0]=(gearBits && (gearBits&(gearBits-1)))?1:0;
-  input.buttons=(stableSwitches>>6)&0x3ff;
-  input.buttons &= ~(1<<2);
-  if(hazard) input.buttons|=1<<2;
-  if(starterUntil && int32_t(starterUntil-now)>0) input.buttons|=1<<1;
-  else starterUntil=0;
-  // Ignition is a physical maintained switch and always overrides touch starter.
-  if(!(input.buttons&1)) input.buttons&=~(1<<1);
   input.joyX=analogRead(JOY_X); input.joyY=analogRead(JOY_Y);
-  joy.update(digitalRead(JOY_BUTTON)==LOW,now); input.joyButton=joy.stable;
-  if(!mcpOK) { input.throttle=0; input.brake=4095; input.clutch=4095; input.gear=0; input.buttons=0; }
+  bool joyChanged=joy.update(digitalRead(JOY_BUTTON)==LOW,now);
+  input.joyButton=joy.stable;
+
+  if(mcpOK) {
+    input.gear=Rig::decodeGear(stableSwitches);
+    uint16_t gearBits=stableSwitches&63;
+    input.reserved[0]=(gearBits && (gearBits&(gearBits-1)))?1:0;
+    input.buttons=(stableSwitches>>6)&0x3ff;
+    input.buttons &= ~(1<<2);
+    if(hazard) input.buttons|=1<<2;
+    if(starterUntil && int32_t(starterUntil-now)>0) input.buttons|=1<<1;
+    else starterUntil=0;
+    // Ignition is a physical maintained switch and always overrides touch starter.
+    if(!(input.buttons&1)) input.buttons&=~(1<<1);
+  } else {
+    // Fallback mode when MCP23017 is offline: pass real pedals & encoder through!
+    // Ignition is kept ON (bit 0 = 1). Pressing the joystick button (GPIO17) gives a 250 ms starter pulse.
+    // Moving joystick Y full up/down (>3300 or <800) also shifts up/down.
+    input.reserved[0]=0;
+    int8_t shiftDir = (input.joyY > 3300) ? 1 : (input.joyY < 800) ? -1 : 0;
+    if(shiftDir != 0 && prevJoyShift == 0) {
+      if(shiftDir > 0) {
+        if(fallbackGear == 6) fallbackGear = 0;
+        else if(fallbackGear < 5) fallbackGear++;
+      } else {
+        if(fallbackGear == 0) fallbackGear = 6;
+        else if(fallbackGear == 6) fallbackGear = 0;
+        else fallbackGear--;
+      }
+    }
+    prevJoyShift = shiftDir;
+    if(joyChanged && joy.stable) {
+      starterUntil = now + 250;
+    }
+    input.gear = fallbackGear;
+    input.buttons = 1; // Ignition ON
+    if(hazard) input.buttons |= (1<<2);
+    if(starterUntil && int32_t(starterUntil-now)>0) input.buttons |= (1<<1);
+    else starterUntil=0;
+  }
 }
 void updateMotor(uint32_t now) {
   if(!ENABLE_FFB || !pwmOK || !armed || !centered || !mcpOK || !gameAlive(now) || !screenAlive(now) || !(input.buttons&1) || input.reserved[0] || abs(readEncoder())>=STEERING_HARD_LIMIT) {
@@ -189,7 +256,7 @@ void setup() {
   uint32_t previousStage=lastStage; lastStage=ST_BOOT;
   Serial0.setTxBufferSize(512);
   Serial0.begin(115200,SERIAL_8N1,44,43);
-  Serial0.printf("\n[RIG fix1] reset=%d previousStage=%lu FFB=%d\n",int(esp_reset_reason()),(unsigned long)previousStage,int(ENABLE_FFB));
+  Serial0.printf("\n[RIG fix2] reset=%d previousStage=%lu FFB=%d\n",int(esp_reset_reason()),(unsigned long)previousStage,int(ENABLE_FFB));
   dash.setRxBufferSize(512); dash.begin(115200,SERIAL_8N1,DASH_RX,DASH_TX);
   analogReadResolution(12); analogSetAttenuation(ADC_11db);
   pinMode(JOY_BUTTON,INPUT_PULLUP);
@@ -197,11 +264,7 @@ void setup() {
   encoderPrevious=(digitalRead(ENCODER_A)<<1)|digitalRead(ENCODER_B);
   attachInterrupt(digitalPinToInterrupt(ENCODER_A),encoderISR,CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER_B),encoderISR,CHANGE);
-  Wire.begin(I2C_SDA,I2C_SCL,100000); Wire.setTimeOut(5); mcpOK=initMCP();
-  for(uint8_t address=0x20;address<=0x27;address++) {
-    Wire.beginTransmission(address);
-    if(Wire.endTransmission()==0) i2cAckMask|=1<<(address-0x20);
-  }
+  mcpOK=findMCP();
   pinMode(ETH_CS,OUTPUT); digitalWrite(ETH_CS,HIGH);
   pinMode(ETH_RST,OUTPUT); digitalWrite(ETH_RST,LOW); delay(25); digitalWrite(ETH_RST,HIGH); delay(150);
   SPI.begin(ETH_SCK,ETH_MISO,ETH_MOSI,ETH_CS);
@@ -227,7 +290,7 @@ void setup() {
   if(esp_task_wdt_status(nullptr)==ESP_ERR_INVALID_STATE) esp_task_wdt_init(&wdt);
   else esp_task_wdt_reconfigure(&wdt);
   esp_task_wdt_add(nullptr);
-  Serial0.println("[RIG] Ready. Motor locked. Missing W5500: check SPI/power, then reset S3.");
+  Serial0.println("[RIG] Ready. Motor locked. Pedals & encoder unlocked even if MCP=0.");
 }
 void loop() {
   uint32_t now=millis();
@@ -241,16 +304,23 @@ void loop() {
   if(uint32_t(now-scanAt)>=5) { lastStage=ST_INPUT; scanAt=now; scanInputs(now); }
   if(uint32_t(now-motorAt)>=1) { lastStage=ST_MOTOR; motorAt=now; updateMotor(now); }
   if(!screenAlive(now)) { disarm(); haveCommand=false; starterUntil=0; }
+  // MCP23017 missing or dropped out: look for it again once a second.
+  if(!mcpOK && uint32_t(now-mcpRetryAt)>=1000) {
+    lastStage=ST_INPUT; mcpRetryAt=now;
+    if(findMCP()) Serial0.printf("[RIG] MCP23017 OK addr=%02x SDA=%d SCL=%d\n",mcpAddr,activeSDA,activeSCL);
+  }
   if(uint32_t(now-sendAt)>=10 && ethernetReady && udpReady && ethernetOK) {
     lastStage=ST_UDP_TX; sendAt=now;
-    if(udp.beginPacket(pcIP,9999) && udp.write(reinterpret_cast<uint8_t*>(&input),sizeof(input))==sizeof(input) && udp.endPacket()) ++txOK;
+    bool unicast=gameKnown && uint32_t(now-lastFeedback)<1000;
+    if(udp.beginPacket(unicast?gameIP:broadcastIP,9999) && udp.write(reinterpret_cast<uint8_t*>(&input),sizeof(input))==sizeof(input) && udp.endPacket()) ++txOK;
     else ++txFailed;
   }
   if(uint32_t(now-dashAt)>=50) { lastStage=ST_UART_TX; dashAt=now; sendDashboard(now); }
   static uint32_t debugAt=0;
-  if(uint32_t(now-debugAt)>=1000 && Serial0.availableForWrite()>=180) {
+  if(uint32_t(now-debugAt)>=1000 && Serial0.availableForWrite()>=220) {
     debugAt=now;
-    Serial0.printf("[RIG] ms=%lu chip=%d ver=%02x i2c=%02x link=%d udp=%d mcp=%d tx=%lu fail=%lu adc=%u/%u/%u gear=%u buttons=%03x\n",(unsigned long)now,int(ethernetReady),w5500Version,i2cAckMask,int(ethernetOK),int(udpReady),int(mcpOK),(unsigned long)txOK,(unsigned long)txFailed,rawThrottle,rawBrake,rawClutch,input.gear,input.buttons);
+    bool unicast=gameKnown && uint32_t(now-lastFeedback)<1000;
+    Serial0.printf("[RIG] ms=%lu chip=%d ver=%02x i2c=%02x link=%d udp=%d mcp=%d tx=%lu fail=%lu dst=%s game=%d enc=%ld adc=%u/%u/%u out=%u/%u/%u gear=%u sw=%04x btn=%03x\n",(unsigned long)now,int(ethernetReady),w5500Version,i2cAckMask,int(ethernetOK),int(udpReady),int(mcpOK),(unsigned long)txOK,(unsigned long)txFailed,unicast?"game":"bcast",int(gameAlive(now)),(long)input.encoder,rawThrottle,rawBrake,rawClutch,input.throttle,input.brake,input.clutch,input.gear,stableSwitches,input.buttons);
   }
   lastStage=ST_IDLE;
   esp_task_wdt_reset(); delay(1);

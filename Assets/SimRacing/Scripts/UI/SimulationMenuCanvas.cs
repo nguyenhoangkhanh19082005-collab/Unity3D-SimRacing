@@ -62,6 +62,11 @@ namespace SimRacing
         private Toggle invertBrakeToggle;
         private Toggle invertClutchToggle;
         private Text livePedalsText;
+        private Text rigDiagText, steerMessageText, pedalMessageText, gearMessageText;
+        private Button pedalCalButton, gearLearnButton;
+        private Toggle manualClutchToggle;
+        private string rigSteerMessage = "Đặt vô lăng thẳng rồi bấm B1, sau đó quay hết sang phải và bấm B2.";
+        private string rigPedalMessage = "Bấm \"Bắt đầu hiệu chỉnh\" nếu % bàn đạp không về 0 khi nhả hoặc không lên 100% khi đạp hết.";
 
         // Results dynamic elements
         private Text resultsTitle;
@@ -423,73 +428,124 @@ namespace SimRacing
             var info1 = CreateText(panel.transform, "Chế độ điều khiển (Bàn phím / Buồng lái thật) chọn ở màn hình chính, đổi khi đang lái bằng F10.", 16, TextInk, FontStyle.Normal, TextAnchor.MiddleLeft);
             SetRect(info1.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -340), new Vector2(520, -290));
 
-            var info2 = CreateText(panel.transform, "Khởi hành: giữ phanh, về N, nhả ga → F9 → bật khóa và đề máy → đạp côn, vào số 1 và nhả côn từ từ.", 15, TextMuted, FontStyle.Normal, TextAnchor.MiddleLeft);
-            SetRect(info2.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -440), new Vector2(520, -350));
+            var info2 = CreateText(panel.transform, "Lái bằng buồng lái: bật KHÓA ĐIỆN → đạp phanh, cần số về N, nhả ga → nhấn nút ĐỀ (hoặc F9) để nhận xe và nổ máy. Khởi hành: đạp hết côn, vào số 1, nhả côn từ từ và thêm ga. Mỗi lần sang số đều phải đạp côn. Dừng xe: đạp côn + phanh, về N.", 15, TextMuted, FontStyle.Normal, TextAnchor.UpperLeft);
+            SetRect(info2.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -520), new Vector2(520, -355));
 
-            // Right column: Rig Calibration
-            rigInfoLabel = CreateText(panel.transform, "Rig UDP 9999", 20, TextInk, FontStyle.Bold, TextAnchor.MiddleLeft);
+            // Right column: physical cockpit (ESP32) diagnostics and the three calibration wizards
+            rigInfoLabel = CreateText(panel.transform, "BUỒNG LÁI", 20, TextInk, FontStyle.Bold, TextAnchor.MiddleLeft);
             SetRect(rigInfoLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(560, -120), new Vector2(-40, -90));
+            rigDiagText = CreateText(panel.transform, "", 14, TextMuted, FontStyle.Normal, TextAnchor.UpperLeft);
+            SetRect(rigDiagText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(560, -190), new Vector2(-40, -125));
 
-            steerRangeLabel = CreateText(panel.transform, "Nửa hành trình vô lăng", 16, TextMuted, FontStyle.Normal, TextAnchor.MiddleLeft);
-            SetRect(steerRangeLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(560, -165), new Vector2(-40, -135));
-
+            // 1. Steering wheel
+            steerRangeLabel = CreateText(panel.transform, "1. VÔ LĂNG", 17, AccentColor, FontStyle.Bold, TextAnchor.MiddleLeft);
+            SetRect(steerRangeLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(560, -228), new Vector2(-40, -200));
+            var centerBtn = CreateStyledButton(panel.transform, "B1: Vô lăng thẳng → Đặt giữa", 15, () =>
+            {
+                if (app?.Rig != null) rigSteerMessage = app.Rig.CenterSteering();
+                RefreshSettingsUI();
+            });
+            SetRect(centerBtn.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(560, -280), new Vector2(860, -236));
+            var rightBtn = CreateStyledButton(panel.transform, "B2: Quay hết PHẢI → Ghi", 15, () =>
+            {
+                if (app?.Rig != null) rigSteerMessage = app.Rig.RecordSteeringRight();
+                RefreshSettingsUI();
+            });
+            SetRect(rightBtn.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(875, -280), new Vector2(1175, -236));
+            invertSteerToggle = CreateToggle(panel.transform, " Đảo chiều", val =>
+            {
+                if (app?.Rig?.calibration == null) return;
+                app.Rig.calibration.invertSteering = val; app.Rig.SaveCalibration();
+            });
+            SetRect(invertSteerToggle.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(1195, -276), new Vector2(1380, -240));
             steerRangeSlider = CreateSlider(panel.transform, val =>
             {
-                if (app?.Rig?.calibration != null)
+                if (app?.Rig?.calibration == null) return;
+                app.Rig.calibration.steeringHalfRangeTicks = val;
+                RefreshSettingsUI();
+            }, 300, 8000);
+            SetRect(steerRangeSlider.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(1, 1), new Vector2(560, -310), new Vector2(-40, -290));
+            steerMessageText = CreateText(panel.transform, "", 14, TextInk, FontStyle.Normal, TextAnchor.MiddleLeft);
+            SetRect(steerMessageText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(560, -345), new Vector2(-40, -315));
+
+            // 2. Pedals
+            var pedalHeader = CreateText(panel.transform, "2. BÀN ĐẠP (ga · phanh · côn)", 17, AccentColor, FontStyle.Bold, TextAnchor.MiddleLeft);
+            SetRect(pedalHeader.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(560, -383), new Vector2(-40, -355));
+            livePedalsText = CreateText(panel.transform, "GA 0%  PHANH 0%  CÔN 0%", 18, TextInk, FontStyle.Bold, TextAnchor.MiddleLeft);
+            SetRect(livePedalsText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(560, -418), new Vector2(-40, -388));
+            pedalCalButton = CreateStyledButton(panel.transform, "Bắt đầu hiệu chỉnh", 15, () =>
+            {
+                if (app?.Rig == null) return;
+                if (!app.Rig.PedalCalibrating)
                 {
-                    app.Rig.calibration.steeringHalfRangeTicks = val;
-                    RefreshSettingsUI();
+                    app.Rig.BeginPedalCalibration();
+                    rigPedalMessage = "Đạp HẾT từng bàn đạp (ga, phanh, côn) 2-3 lần, rồi NHẢ HẾT cả ba và bấm Xong.";
                 }
-            }, 1000, 20000);
-            SetRect(steerRangeSlider.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(1, 1),
-                new Vector2(560, -200), new Vector2(-40, -175));
-
-            var setCenterBtn = CreateStyledButton(panel.transform, "Đặt vị trí giữa hiện tại", 16, () =>
-            {
-                if (app?.Rig != null)
-                {
-                    app.Rig.calibration.steeringCenterTicks = app.Rig.Raw.encoder;
-                    RefreshSettingsUI();
-                }
+                else app.Rig.FinishPedalCalibration(out rigPedalMessage);
+                RefreshSettingsUI();
             });
-            SetRect(setCenterBtn.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(560, -260), new Vector2(850, -215));
-
-            invertSteerToggle = CreateToggle(panel.transform, " Đảo chiều vô lăng", val =>
+            SetRect(pedalCalButton.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(560, -470), new Vector2(860, -426));
+            var pedalCancel = CreateStyledButton(panel.transform, "Hủy", 15, () =>
             {
-                if (app?.Rig?.calibration != null) app.Rig.calibration.invertSteering = val;
+                if (app?.Rig != null && app.Rig.PedalCalibrating) { app.Rig.CancelPedalCalibration(); rigPedalMessage = "Đã hủy, giữ hiệu chỉnh cũ."; }
+                RefreshSettingsUI();
             });
-            SetRect(invertSteerToggle.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(880, -260), new Vector2(1100, -220));
-
-            // Invert pedals toggles
-            invertThrottleToggle = CreateToggle(panel.transform, " Đảo chân ga", val =>
+            SetRect(pedalCancel.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(875, -470), new Vector2(975, -426));
+            invertThrottleToggle = CreateToggle(panel.transform, " Đảo ga", val =>
             {
-                if (app?.Rig?.calibration != null) app.Rig.calibration.invertThrottle = val;
+                if (app?.Rig?.calibration == null) return;
+                app.Rig.calibration.invertThrottle = val; app.Rig.SaveCalibration();
             });
-            SetRect(invertThrottleToggle.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(560, -320), new Vector2(740, -280));
-
+            SetRect(invertThrottleToggle.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(995, -466), new Vector2(1150, -430));
             invertBrakeToggle = CreateToggle(panel.transform, " Đảo phanh", val =>
             {
-                if (app?.Rig?.calibration != null) app.Rig.calibration.invertBrake = val;
+                if (app?.Rig?.calibration == null) return;
+                app.Rig.calibration.invertBrake = val; app.Rig.SaveCalibration();
             });
-            SetRect(invertBrakeToggle.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(750, -320), new Vector2(930, -280));
-
+            SetRect(invertBrakeToggle.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(1160, -466), new Vector2(1320, -430));
             invertClutchToggle = CreateToggle(panel.transform, " Đảo côn", val =>
             {
-                if (app?.Rig?.calibration != null) app.Rig.calibration.invertClutch = val;
+                if (app?.Rig?.calibration == null) return;
+                app.Rig.calibration.invertClutch = val; app.Rig.SaveCalibration();
             });
-            SetRect(invertClutchToggle.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(940, -320), new Vector2(1120, -280));
+            SetRect(invertClutchToggle.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(1330, -466), new Vector2(1480, -430));
+            pedalMessageText = CreateText(panel.transform, "", 14, TextInk, FontStyle.Normal, TextAnchor.UpperLeft);
+            SetRect(pedalMessageText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(560, -522), new Vector2(-40, -476));
 
-            livePedalsText = CreateText(panel.transform, "GA 0%  PHANH 0%  CÔN 0%", 18, AccentColor, FontStyle.Bold, TextAnchor.MiddleLeft);
-            SetRect(livePedalsText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(560, -380), new Vector2(-40, -340));
+            // 3. H-shifter
+            var gearHeader = CreateText(panel.transform, "3. CẦN SỐ H (6 công tắc = số 1·2·3·4·5·R, không chạm công tắc nào = N)", 17, AccentColor, FontStyle.Bold, TextAnchor.MiddleLeft);
+            SetRect(gearHeader.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(560, -560), new Vector2(-40, -532));
+            gearLearnButton = CreateStyledButton(panel.transform, "Học cần số", 15, () =>
+            {
+                app?.Rig?.BeginGearLearn();
+                RefreshSettingsUI();
+            });
+            SetRect(gearLearnButton.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(560, -612), new Vector2(760, -568));
+            var gearCancel = CreateStyledButton(panel.transform, "Hủy", 15, () =>
+            {
+                if (app?.Rig != null && app.Rig.GearLearning) app.Rig.CancelGearLearn();
+                RefreshSettingsUI();
+            });
+            SetRect(gearCancel.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(775, -612), new Vector2(875, -568));
+            var gearReset = CreateStyledButton(panel.transform, "Mặc định", 15, () =>
+            {
+                app?.Rig?.ResetGearMap();
+                RefreshSettingsUI();
+            });
+            SetRect(gearReset.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(890, -612), new Vector2(1040, -568));
+            manualClutchToggle = CreateToggle(panel.transform, " Côn thực tế: phải đạp côn khi vào số, có thể chết máy", val =>
+            {
+                if (app?.Rig?.calibration == null) return;
+                app.Rig.calibration.manualClutch = val; app.Rig.SaveCalibration();
+            });
+            SetRect(manualClutchToggle.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(1060, -608), new Vector2(1700, -572));
+            gearMessageText = CreateText(panel.transform, "", 14, TextInk, FontStyle.Normal, TextAnchor.UpperLeft);
+            SetRect(gearMessageText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(560, -680), new Vector2(-40, -620));
 
             // Save & Return Button
             var saveBtn = CreateStyledButton(panel.transform, "LƯU VÀ TRỞ VỀ", 18, () =>
             {
+                app.Rig?.CancelCalibration();
                 app.SavePreferences();
                 app.ScreenState = "menu";
                 UpdateVisibility();
@@ -528,7 +584,7 @@ namespace SimRacing
             SetRect(toMenuBtn.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(1, 1),
                 new Vector2(40, -275), new Vector2(-40, -220));
 
-            var hint = CreateText(card.transform, "Buồng lái: sau khi tiếp tục, về N, nhả ga, giữ phanh rồi nhấn F9.\nF10 đổi nhanh giữa bàn phím và buồng lái.", 15, TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
+            var hint = CreateText(card.transform, "Buồng lái: sau khi tiếp tục, về N, nhả ga, giữ phanh rồi nhấn nút ĐỀ (hoặc F9).\nF10 đổi nhanh giữa bàn phím và buồng lái.", 15, TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
             SetRect(hint.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(20, 20), new Vector2(-20, 85));
         }
 
@@ -717,22 +773,58 @@ namespace SimRacing
 
             if (app.Rig != null)
             {
-                if (rigInfoLabel)
-                    rigInfoLabel.text = $"Rig: {app.Rig.PacketsPerSecond} gói/giây · Encoder {app.Rig.Raw.encoder}";
-
                 var c = app.Rig.calibration;
                 if (c != null)
                 {
                     if (steerRangeSlider) steerRangeSlider.SetValueWithoutNotify(c.steeringHalfRangeTicks);
-                    if (steerRangeLabel) steerRangeLabel.text = $"Nửa hành trình vô lăng: {c.steeringHalfRangeTicks:0} ticks";
                     if (invertSteerToggle) invertSteerToggle.SetIsOnWithoutNotify(c.invertSteering);
                     if (invertThrottleToggle) invertThrottleToggle.SetIsOnWithoutNotify(c.invertThrottle);
                     if (invertBrakeToggle) invertBrakeToggle.SetIsOnWithoutNotify(c.invertBrake);
                     if (invertClutchToggle) invertClutchToggle.SetIsOnWithoutNotify(c.invertClutch);
+                    if (manualClutchToggle) manualClutchToggle.SetIsOnWithoutNotify(c.manualClutch);
                 }
+                RefreshRigLive();
+            }
+        }
 
-                if (livePedalsText)
-                    livePedalsText.text = $"GA {app.Rig.Raw.throttle:P0}     PHANH {app.Rig.Raw.brake:P0}     CÔN {app.Rig.Raw.clutch:P0}";
+        /// <summary>Live cockpit readings on the settings screen (called every frame while it is open).</summary>
+        private void RefreshRigLive()
+        {
+            var rig = app.Rig;
+            if (rig == null || rig.calibration == null) return;
+            var r = rig.Raw;
+            var c = rig.calibration;
+            if (rigInfoLabel)
+                rigInfoLabel.text = rig.Connected
+                    ? $"BUỒNG LÁI · ĐÃ KẾT NỐI · {rig.PacketsPerSecond} gói/giây từ {rig.RemoteAddress}"
+                    : $"BUỒNG LÁI · CHƯA NHẬN TÍN HIỆU (UDP {rig.Port})";
+            if (rigDiagText)
+            {
+                string shifter = r.gearFault ? "LỖI: 2 công tắc cùng chạm"
+                    : r.switchGear == 0 ? "không chạm công tắc nào (N)"
+                    : $"công tắc U{r.switchGear} → số {RigProtocol.GearName(r.gear)}";
+                rigDiagText.text = rig.Connected
+                    ? $"Encoder {r.encoder} → lái {r.steer * 100:+0;-0;0}%     Cần số: {shifter}\nKhóa điện {(r.ignition ? "BẬT" : "TẮT")}   ·   Nút đề {(r.starter ? "ĐANG NHẤN" : "nhả")}   ·   Đèn {r.headlights}   ·   Còi {(r.horn ? "kêu" : "—")}   ·   Xi nhan {(r.left ? "trái " : "")}{(r.right ? "phải" : "")}"
+                    : $"IP của máy tính: {(rig.LocalAddresses == "" ? "không có" : rig.LocalAddresses)}\nCần IP 192.168.1.100 trên cổng LAN nối control box và tường lửa cho phép UDP {rig.Port}: chạy Thiet_Lap_Mang_Buong_Lai.bat (quyền Admin).";
+            }
+            if (steerRangeLabel) steerRangeLabel.text = $"1. VÔ LĂNG · hết lái {c.steeringHalfRangeTicks:0} ticks ≈ {c.steeringHalfRangeTicks / 2400f * 360:0}° mỗi bên";
+            if (steerMessageText) steerMessageText.text = rigSteerMessage;
+            if (livePedalsText)
+                livePedalsText.text = $"GA {r.throttle * 100:0}% ({r.throttleADC})     PHANH {r.brake * 100:0}% ({r.brakeADC})     CÔN {r.clutch * 100:0}% ({r.clutchADC})";
+            if (pedalCalButton)
+            {
+                var label = pedalCalButton.GetComponentInChildren<Text>();
+                if (label) label.text = rig.PedalCalibrating ? "Xong (đã nhả hết)" : "Bắt đầu hiệu chỉnh";
+                SetButtonActive(pedalCalButton, rig.PedalCalibrating);
+            }
+            if (pedalMessageText) pedalMessageText.text = rig.PedalCalibrating ? rigPedalMessage + "\n" + rig.PedalTravel : rigPedalMessage;
+            if (gearLearnButton) SetButtonActive(gearLearnButton, rig.GearLearning);
+            if (gearMessageText)
+            {
+                var parts = new List<string>();
+                for (int s = 1; s <= 6; s++) parts.Add($"U{s}→{RigProtocol.GearName(c.Gear(s))}");
+                string map = "Đang dùng: " + string.Join("   ", parts);
+                gearMessageText.text = rig.GearMessage == "" ? map : rig.GearMessage + (rig.GearLearning ? "" : "\n" + map);
             }
         }
 
@@ -767,13 +859,8 @@ namespace SimRacing
                 if (img) img.color = IgnitionRed * pulse;
             }
 
-            // Live pedals update when in settings
-            if (app.ScreenState == "settings" && livePedalsText && app.Rig != null)
-            {
-                livePedalsText.text = $"GA {app.Rig.Raw.throttle:P0}     PHANH {app.Rig.Raw.brake:P0}     CÔN {app.Rig.Raw.clutch:P0}";
-                if (rigInfoLabel)
-                    rigInfoLabel.text = $"Rig: {app.Rig.PacketsPerSecond} gói/giây · Encoder {app.Rig.Raw.encoder}";
-            }
+            // Live cockpit readings and calibration progress while the settings screen is open
+            if (app.ScreenState == "settings" && app.Rig != null) RefreshRigLive();
         }
 
         // --- uGUI Helpers ---

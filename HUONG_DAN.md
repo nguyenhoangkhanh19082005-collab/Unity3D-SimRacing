@@ -21,12 +21,14 @@ Chọn ở hàng **ĐIỀU KHIỂN** trên màn hình chính. Lựa chọn đư�
 
 ### Khởi hành với buồng lái thật
 
-1. Chọn **Buồng lái thật (ESP32)**, chọn xe, cung đường, thời tiết rồi bắt đầu.
-2. Buồng lái gửi UDP đến cổng **9999** của máy. HUD báo *CHƯA KẾT NỐI BUỒNG LÁI* nếu chưa nhận được dữ liệu.
-3. Giữ phanh, về N, nhả ga và thả nút đề, rồi nhấn **F9** để tiếp quản. Đợi đếm ngược.
-4. Bật khóa, đề máy. Đạp côn, vào số 1, thêm ga và nhả côn từ từ.
+**Hướng dẫn đầy đủ (mạng, nạp firmware, hiệu chỉnh vô lăng/bàn đạp/cần số, xử lý lỗi): [HUONG_DAN_BUONG_LAI.md](HUONG_DAN_BUONG_LAI.md).**
 
-Mất gói tin quá 250 ms, mất tiêu điểm cửa sổ, tạm dừng, đổi chế độ điều khiển hoặc lỗi cần số đều khóa điều khiển và ngắt phản hồi lực. Khi kết nối lại, làm lại bước 3. Game không tự tiếp tục ga cũ.
+1. Lần đầu trên mỗi máy: chạy `Thiet_Lap_Mang_Buong_Lai.bat` (quyền Admin) để mở tường lửa UDP 9999 và đặt IP 192.168.1.100 cho cổng LAN, rồi vào **THIẾT LẬP** hiệu chỉnh vô lăng, bàn đạp và học cần số.
+2. Chọn **Buồng lái thật (ESP32)**, chọn xe, cung đường, thời tiết rồi bắt đầu. HUD báo *CHƯA KẾT NỐI BUỒNG LÁI* nếu chưa nhận được dữ liệu, kèm nguyên nhân.
+3. Bật khóa điện, giữ phanh, về N, nhả ga, rồi nhấn **nút ĐỀ** trên buồng lái (hoặc **F9**) để nhận xe và nổ máy. Nếu chưa được, HUD ghi rõ còn thiếu gì.
+4. Đạp côn, vào số 1, thêm ga và nhả côn từ từ. Khi bật *Côn thực tế*, sang số phải đạp côn và xe có thể chết máy như xe số sàn thật.
+
+Mất gói tin quá 250 ms, mất tiêu điểm cửa sổ, tạm dừng hoặc đổi chế độ điều khiển đều khóa điều khiển và ngắt phản hồi lực. Khi kết nối lại, làm lại bước 3. Game không tự tiếp tục ga cũ. Cần số chạm hai công tắc cùng lúc được coi là N.
 
 ## Các chế độ chơi
 
