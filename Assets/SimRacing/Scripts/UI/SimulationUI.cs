@@ -114,11 +114,11 @@ namespace SimRacing
             Label(38, 627, 288, 38, car.Refueling ? "ĐANG TIẾP NHIÊN LIỆU" : car.EngineRunning ? "ĐỘNG CƠ ĐANG CHẠY" : keyboard ? "CHẾ ĐỘ BÀN PHÍM" : "BẬT KHÓA VÀ ĐỀ MÁY TỪ BUỒNG LÁI", small);
             Label(250, 678, 1020, 30, keyboard
                 ? "W/S: Ga · Phanh/Lùi    A/D: Lái    Space: Phanh    H: Đèn    V: Góc nhìn    F10: Sang buồng lái    Esc: Tạm dừng"
-                : "Nhận xe: phanh + số N + nút ĐỀ (hoặc F9)    V/nút joystick: Góc nhìn    Backspace: Cứu hộ    F10: Sang bàn phím    Esc: Tạm dừng", small);
+                : "Nhận xe: phanh + côn + nút ĐỀ (hoặc F9)    N: Về số N    V/nút joystick: Góc nhìn    Backspace: Cứu hộ    F10: Sang bàn phím    Esc: Tạm dừng", small);
             if (!keyboard && app.Rig.Connected)
             {
                 var r = app.Rig.Raw;
-                Label(360, 652, 900, 24, $"CẦN SỐ {RigProtocol.GearName(r.gear)}{(r.gearFault ? " (lỗi 2 công tắc)" : "")}   ·   GA {r.throttle * 100:0}%   PHANH {r.brake * 100:0}%   CÔN {r.clutch * 100:0}%   ·   LÁI {r.steer * 100:+0;-0;0}%   ·   KHÓA ĐIỆN {(r.ignition ? "BẬT" : "TẮT")}", small);
+                Label(360, 652, 900, 24, $"CẦN SỐ {RigProtocol.GearName(r.gear)}{(r.gearFault ? " (lỗi 2 công tắc)" : app.Rig.NeutralSelected ? " (phím N)" : "")}   ·   GA {r.throttle * 100:0}%   PHANH {r.brake * 100:0}%   CÔN {r.clutch * 100:0}%   ·   LÁI {r.steer * 100:+0;-0;0}%   ·   KHÓA ĐIỆN {(r.ignition ? "BẬT" : "TẮT")}", small);
             }
 
             string notice = session.Notice != "" ? session.Notice : car.Hint;

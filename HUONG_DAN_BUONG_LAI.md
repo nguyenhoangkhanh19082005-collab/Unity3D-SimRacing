@@ -28,22 +28,23 @@ Cần số trong bản vẽ 3D (chi tiết `HVitesV4`, tiếng Thổ Nhĩ Kỳ n
 ```
    1   3   5        ← cần đẩy về phía trước: chạm U của số 1 / 3 / 5
    |   |   |
-   +---+---+        ← ở giữa, không chạm công tắc nào = số N (mo)
+   +---+---+        ← ở giữa: không chạm công tắc nào
    |   |   |
    2   4   R        ← cần kéo về phía sau: chạm U của số 2 / 4 / lùi
 ```
 
-- **Không chạm công tắc nào = N.** Đây là vị trí bắt buộc khi nổ máy và khi nhận xe.
+- **Công tắc hành trình chỉ bị nhấn lúc cần đang đè vào rãnh số**; buông tay là công tắc nhả ra. Vì vậy firmware **fix4 tự giữ số**: số vừa gạt được giữ nguyên tới khi gạt sang số khác, kể cả khi cần nhả khỏi công tắc. (Firmware cũ báo N ngay khi nhả công tắc, nên vào số 1 rồi buông tay là game về N và xe không đi.)
+- Vì cần số không có công tắc cho N, sau lần gạt đầu tiên firmware không bao giờ báo N nữa (chỉ khi vừa bật nguồn). Do đó game nhận xe và cho đề máy khi **đạp hết côn**, không bắt buộc N. Muốn về N thật (đứng chờ mà không giữ côn): nhấn **phím N** trên bàn phím. Game ở N tới khi bạn gạt sang số khác, hoặc nhả côn rồi đạp côn lại (lúc đó số đang giữ vào lại).
 - Công tắc U1…U6 nối vào GPA0…GPA5 của MCP23017. Bảng `GEAR_PIN` trong `Config.h` ghi số nào chạm chân GPA nào. Trên buồng lái hiện tại đã đo được: số 1 = GPA0, số 2 = GPA3, số 3 = GPA1, số 4 = GPA4, số 5 = GPA2, R = GPA5. Firmware gửi thẳng số 1…5 / 6 = R cho game.
 - Game còn có **bảng cần số** riêng (mục 4.3). Nếu đã sửa `GEAR_PIN` trong firmware thì để bảng của game ở **Mặc định**, đừng ánh xạ hai lần.
-- Nếu hai công tắc cùng chạm (cần nằm lệch giữa hai rãnh, hoặc công tắc bị dội), game coi là N và báo *lỗi 2 công tắc*.
+- Nếu hai công tắc cùng chạm (cần nằm lệch giữa hai rãnh, hoặc công tắc bị dội), game coi là N và báo *lỗi 2 công tắc*; firmware vẫn giữ số cũ.
 
 Khi bật tùy chọn **Côn thực tế** (mặc định), game xử lý như xe số sàn thật:
 
 - Máy đang nổ mà gạt vào số **không đạp côn**: số không vào, xe vẫn ở N và HUD báo *KHÔNG VÀO ĐƯỢC SỐ*.
 - Vào số lùi khi xe còn đang chạy tới: không vào.
 - Nhả côn ở số 1 hoặc R, không ga, không phanh: xe bò chậm như xe thật ở vòng tua không tải.
-- Đang có số mà phanh dừng hẳn xe nhưng không đạp côn: **chết máy**. Muốn đề lại thì đạp côn hoặc về N rồi nhấn nút ĐỀ.
+- Đang có số mà phanh dừng hẳn xe nhưng không đạp côn: **chết máy**. Muốn đề lại thì đạp hết côn (hoặc phím N) rồi nhấn nút ĐỀ.
 - Đề máy khi đang có số thì phải đạp côn.
 
 Tắt **Côn thực tế** trong THIẾT LẬP nếu muốn lái dễ hơn (khi đó vào số không cần côn và không chết máy).
@@ -64,7 +65,7 @@ Tắt **Côn thực tế** trong THIẾT LẬP nếu muốn lái dễ hơn (khi 
 
 1. Mở `Hardware/firmware-Arduino IDE/ControlBoxS3/ControlBoxS3.ino` bằng Arduino IDE (core **esp32 3.3.x**). Cài thư viện **Ethernet** (Arduino).
 2. Board **ESP32S3 Dev Module**, chọn đúng cổng COM, rồi Upload.
-3. Mở **Serial Monitor 115200** (cổng USB-UART CH343). Sau khi khởi động sẽ thấy `[RIG fix3] ...` và mỗi giây một dòng trạng thái:
+3. Mở **Serial Monitor 115200** (cổng USB-UART CH343). Sau khi khởi động sẽ thấy `[RIG fix4] ...` và mỗi giây một dòng trạng thái:
 
 ```
 [RIG] ms=… chip=1 ver=04 i2c=01 link=1 udp=1 mcp=1 tx=… fail=0 dst=game game=1 enc=… adc=…/…/… out=…/…/… gear=0 sw=0040 btn=001
@@ -78,10 +79,10 @@ Tắt **Côn thực tế** trong THIẾT LẬP nếu muốn lái dễ hơn (khi 
 | `dst=bcast` / `dst=game` | Đang gửi broadcast / đã thấy game và gửi thẳng tới game | `game` khi game đang mở |
 | `game=1` | Đang nhận phản hồi từ game | `1` khi game đang mở |
 | `adc=a/b/c` | Giá trị thô ga/phanh/côn (0…4095) | Thay đổi khi đạp |
-| `gear` | Công tắc cần số đang chạm (0 = không chạm) | 1…6 khi vào số |
+| `gear` | Số đang giữ (fix4: giữ cả khi đã nhả công tắc; 0 = chưa gạt số nào từ lúc bật nguồn) | 1…6 sau khi gạt số |
 | `sw` | Bit thô của 16 chân MCP23017 | |
 
-Firmware mới tự dò lại MCP23017 mỗi giây nếu mất kết nối. Nó cũng thử đảo SDA/SCL và in cảnh báo nếu dây I2C bị cắm ngược. Một lần đọc I2C lỗi không còn làm mất cần số nữa.
+Firmware mới tự dò lại MCP23017 mỗi giây nếu mất kết nối. Nó cũng thử đảo SDA/SCL và in cảnh báo nếu dây I2C bị cắm ngược. Lỗi đọc I2C dưới 5 lần liên tiếp không làm mất cần số, và số đang giữ không bị xóa khi MCP23017 khởi động lại. Fix4 còn bỏ mẫu ADC đầu sau khi đổi kênh, thêm vùng chết ở hai đầu hành trình bàn đạp và lọc mạnh hơn (12,5% mẫu mới).
 
 ## 4. Hiệu chỉnh trong game (THIẾT LẬP)
 
@@ -115,11 +116,11 @@ Với firmware fix3 (`GEAR_PIN` đã đúng) chỉ cần bấm **Mặc định**
 ## 5. Lái
 
 1. Màn hình chính → **Điều khiển: Buồng lái thật (ESP32)** (hoặc F10 khi đang lái) → chọn xe, đường, chế độ → BẮT ĐẦU.
-2. HUD ghi **BUỒNG LÁI ĐANG KHÓA** cùng việc còn thiếu, ví dụ *về số N · đạp phanh quá nửa (đang 12%)*.
-3. Nhận xe: **bật khóa điện** → **đạp phanh** → **cần số về N** → **nhả ga** → nhấn **nút ĐỀ** trên buồng lái (hoặc F9 trên bàn phím). Xe mở khóa, đếm ngược và nổ máy.
-4. Khởi hành: đạp hết **côn** → vào **số 1** → nhả côn từ từ đồng thời thêm **ga**.
+2. HUD ghi **BUỒNG LÁI ĐANG KHÓA** cùng việc còn thiếu, ví dụ *đạp hết côn (đang ở số 1…) · đạp phanh quá nửa (đang 12%)*.
+3. Nhận xe: **bật khóa điện** → **đạp phanh** + **đạp hết côn** → **nhả ga** → nhấn **nút ĐỀ** trên buồng lái (hoặc F9 trên bàn phím). Xe mở khóa, đếm ngược và nổ máy. Nếu cần số đang ở N (vừa bật nguồn) thì không cần côn.
+4. Khởi hành: giữ hết **côn** → gạt **số 1** (buông cần được, số vẫn giữ) → nhả côn từ từ đồng thời thêm **ga**. Gạt số trước hay sau khi nhận xe đều được, miễn là đang đạp côn: số chỉ vào khi côn được đạp hết.
 5. Lên hoặc xuống số: nhả ga → đạp côn → gạt số → nhả côn.
-6. Dừng: đạp côn + phanh → về **N**.
+6. Dừng: đạp côn + phanh. Muốn nhả côn khi đứng chờ thì nhấn **phím N** trước (HUD ghi *CẦN SỐ N (phím N)*). Đạp côn lại là số đang giữ vào lại.
 7. Lùi: dừng hẳn → đạp côn → vào **R** → nhả côn.
 
 Dưới HUD có dòng trực tiếp: *CẦN SỐ · GA · PHANH · CÔN · LÁI · KHÓA ĐIỆN*.
@@ -138,6 +139,7 @@ Các công tắc khác: **Khóa điện** (GPA6) tắt thì máy tắt. **Đèn*
 | Đã kết nối nhưng **ĐANG KHÓA** mãi | Đọc dòng lý do trên HUD. Thường là phanh chưa tới 50% hoặc ga không về 0% vì bàn đạp chưa hiệu chỉnh: làm mục 4.2 |
 | Quay vô lăng phải mà xe rẽ trái, hoặc lái quá nhẹ | Làm mục 4.1 |
 | Gạt số mà game ra số khác | Làm mục 4.3 |
-| Gạt số mà game luôn N | Chưa đạp côn (Côn thực tế), hoặc `mcp=0` trên Serial Monitor (MCP23017 chưa trả lời: kiểm tra 3V3, GND, SDA=GPIO18, SCL=GPIO8, RESET# kéo lên 3V3) |
+| Vào số rồi buông tay là game về N, xe không đi | Firmware cũ không giữ số: nạp firmware **fix4** (Serial Monitor in `[RIG fix4]`) |
+| Gạt số mà game luôn N | Chưa đạp côn (Côn thực tế), đang ở N do phím N (đạp côn lại hoặc gạt số khác), hoặc `mcp=0` trên Serial Monitor (MCP23017 chưa trả lời: kiểm tra 3V3, GND, SDA=GPIO18, SCL=GPIO8, RESET# kéo lên 3V3) |
 | Nhấn ĐỀ mà máy không nổ | Khóa điện đang TẮT, hoặc đang có số mà chưa đạp côn, hoặc hết xăng |
 | `mcp=0` mà vẫn chạy được | Đó là **chế độ dự phòng**: khóa điện luôn bật, đẩy joystick lên/xuống để đổi số, nhấn joystick để đề. Sửa dây I2C để dùng cần số thật |

@@ -63,6 +63,7 @@ namespace SimRacing
             bool lease = remote != null && now - lastPacket < .25;
             if (lease && (!sender.Equals(remote) || !RigProtocol.Newer(sample.stamp, lastStamp))) return false;
             if (!lease) Held = true;
+            ApplyNeutral(ref sample);
             lastStamp = sample.stamp; Raw = sample; remote = sender; lastPacket = now; count++; Error = "";
             if (PedalCalibrating) TrackPedals(sample);
             return true;
@@ -85,6 +86,7 @@ namespace SimRacing
             wasConnected = connected;
             if (!connected && Clock - addressCheck > 3) RefreshAddresses();
             if (Input.GetKeyDown(KeyCode.F9)) Resume();
+            if (InUse && connected && Input.GetKeyDown(KeyCode.N)) SelectNeutral();
             // Taking the car from the cockpit itself: brake held, neutral, throttle released, then press START.
             bool starter = connected && Raw.starter;
             if (starter && !previousStarter && InUse) TakeOver(true);
@@ -107,6 +109,30 @@ namespace SimRacing
                 OnRigSubnet = list.Exists(a => a.StartsWith("192.168.1."));
             } catch (Exception) { OnRigSubnet = true; }
         }
+        // ---------- Neutral on a latching shifter ----------
+        // The firmware keeps reporting the last gear switch that was pressed, and the H-shifter has no switch for
+        // N. Key N puts the game in neutral; it lasts until the lever selects another gear, or until the clutch is
+        // pressed again after being released (the driver is about to engage the latched gear again).
+        int neutralSwitch;
+        bool neutralClutchReleased;
+        /// <summary>True while key N overrides the gear the firmware still reports.</summary>
+        public bool NeutralSelected => neutralSwitch != 0;
+        public void SelectNeutral()
+        {
+            if (Raw.switchGear == 0 || Raw.gearFault) return;
+            neutralSwitch = Raw.switchGear;
+            neutralClutchReleased = Raw.clutch < .3f;
+            var r = Raw; ApplyNeutral(ref r); Raw = r;
+        }
+        void ApplyNeutral(ref RigSample s)
+        {
+            if (neutralSwitch == 0) return;
+            if (s.gearFault) return; // Lever crossing between switches: already reported as N.
+            if (s.switchGear != neutralSwitch) { neutralSwitch = 0; return; }
+            if (s.clutch < .3f) neutralClutchReleased = true;
+            else if (s.clutch >= RigSample.ClutchIn && neutralClutchReleased) { neutralSwitch = 0; return; }
+            s.gear = 0;
+        }
         public void Hold() { Held = true; }
         /// <summary>F9: hand the car to the cockpit when it is in a safe state.</summary>
         public bool Resume() => TakeOver(false);
@@ -126,7 +152,7 @@ namespace SimRacing
                 if (!Focused) return "bấm chuột vào cửa sổ game";
                 var r = Raw; var need = new List<string>();
                 if (r.gearFault) need.Add("cần số chạm 2 công tắc cùng lúc");
-                else if (r.gear != 0) need.Add($"về số N (đang ở số {RigProtocol.GearName(r.gear)})");
+                else if (r.gear != 0 && r.clutch < RigSample.ClutchIn) need.Add($"đạp hết côn (đang ở số {RigProtocol.GearName(r.gear)}; hoặc phím N về số N)");
                 if (r.throttle > .03f) need.Add($"nhả ga (đang {r.throttle * 100:0}%)");
                 if (r.brake < .5f) need.Add($"đạp phanh quá nửa (đang {r.brake * 100:0}%)");
                 if (VehicleSpeed() > 1) need.Add("dừng hẳn xe");

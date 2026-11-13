@@ -36,6 +36,9 @@ namespace SimRacing.Editor
             b[26]=1;RigProtocol.TryDecode(b,cal,out sample);Check(sample.gear==0 && !sample.SafeToTakeOver,"two shifter switches read as neutral");
             // START button takeover: the safe state ignores the starter bit, F9's Ready does not
             b=RuntimeVerification.Packet(107,0,0,4095,4095,0,3);RigProtocol.TryDecode(b,c,out sample);Check(sample.SafeToTakeOver && !sample.Ready,"start button takeover state");
+            // Latched shifter (firmware fix4): in gear, the clutch pressed replaces neutral for the takeover
+            b=RuntimeVerification.Packet(108,0,0,4095,4095,1,1);RigProtocol.TryDecode(b,c,out sample);Check(sample.gear==1 && sample.Ready,"in gear with clutch pressed is ready");
+            b=RuntimeVerification.Packet(109,0,0,4095,0,1,1);RigProtocol.TryDecode(b,c,out sample);Check(!sample.SafeToTakeOver,"in gear with clutch released is not ready");
             var fb=RigProtocol.Feedback(-500,80,3000,3,45,true,sample,true,256,123);
             Check(fb.Length==16 && RigProtocol.U16(fb,0)==0x4642,"feedback framing");Check(unchecked((short)RigProtocol.U16(fb,2))==-500,"signed feedback");Check(RigProtocol.U16(fb,4)==800 && RigProtocol.U16(fb,6)==3000 && fb[13]==255,"telemetry bounds");
             Check(Mathf.Approximately(c.Feedback(4000),800),"FFB clamp");

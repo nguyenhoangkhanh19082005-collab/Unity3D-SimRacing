@@ -1,5 +1,7 @@
 # Bộ firmware SimRacing: S3 Control Box + WROOM32 Touchscreen
 
+**Cập nhật fix4:** cần số tự giữ số đã gạt (công tắc hành trình chỉ bị nhấn lúc đè cần vào rãnh); không chạm hoặc chạm 2 công tắc thì giữ số cũ; số không bị xóa khi MCP23017 lỗi/khởi động lại (bỏ qua tới 4 lần đọc I2C lỗi liên tiếp). Bàn đạp: bỏ mẫu ADC đầu, vùng chết hai đầu hành trình, lọc 12,5%. Game nhận xe khi đạp hết côn (không cần N) và phím N đưa về số N.
+
 **Cập nhật fix3:** `GEAR_PIN` trong Config.h (số 1,2,3,4,5,R = GPA0,3,1,4,2,5 theo đo thực tế) và dải biến trở đo được của ga/phanh/côn; đọc ADC trung bình 16 mẫu. Sau khi nạp fix3: trong game để bảng cần số ở *Mặc định* và hiệu chỉnh lại bàn đạp nếu đã hiệu chỉnh bằng firmware cũ.
 
 **Cập nhật 13/11/2026 (fix2):** gửi broadcast tới khi game trả lời rồi gửi thẳng tới IP của game, nhận phản hồi từ mọi máy trong 192.168.1.x, tự dò lại MCP23017 mỗi giây (thử cả SDA/SCL đảo), bỏ qua lỗi I2C đơn lẻ. Hướng dẫn vận hành: `HUONG_DAN_BUONG_LAI.md` ở gốc repo.

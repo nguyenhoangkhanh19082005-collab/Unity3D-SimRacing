@@ -428,7 +428,7 @@ namespace SimRacing
             var info1 = CreateText(panel.transform, "Chế độ điều khiển (Bàn phím / Buồng lái thật) chọn ở màn hình chính, đổi khi đang lái bằng F10.", 16, TextInk, FontStyle.Normal, TextAnchor.MiddleLeft);
             SetRect(info1.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -340), new Vector2(520, -290));
 
-            var info2 = CreateText(panel.transform, "Lái bằng buồng lái: bật KHÓA ĐIỆN → đạp phanh, cần số về N, nhả ga → nhấn nút ĐỀ (hoặc F9) để nhận xe và nổ máy. Khởi hành: đạp hết côn, vào số 1, nhả côn từ từ và thêm ga. Mỗi lần sang số đều phải đạp côn. Dừng xe: đạp côn + phanh, về N.", 15, TextMuted, FontStyle.Normal, TextAnchor.UpperLeft);
+            var info2 = CreateText(panel.transform, "Lái bằng buồng lái: bật KHÓA ĐIỆN → đạp phanh + đạp hết côn, nhả ga → nhấn nút ĐỀ (hoặc F9) để nhận xe và nổ máy. Khởi hành: giữ côn, gạt số 1, nhả côn từ từ và thêm ga. Mỗi lần sang số đều phải đạp côn. Cần số tự giữ số đã gạt; phím N đưa về số N (hết N khi gạt số khác hoặc đạp côn lại). Dừng xe: đạp côn + phanh (hoặc phím N).", 15, TextMuted, FontStyle.Normal, TextAnchor.UpperLeft);
             SetRect(info2.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -520), new Vector2(520, -355));
 
             // Right column: physical cockpit (ESP32) diagnostics and the three calibration wizards
@@ -513,7 +513,7 @@ namespace SimRacing
             SetRect(pedalMessageText.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(560, -522), new Vector2(-40, -476));
 
             // 3. H-shifter
-            var gearHeader = CreateText(panel.transform, "3. CẦN SỐ H (6 công tắc = số 1·2·3·4·5·R, không chạm công tắc nào = N)", 17, AccentColor, FontStyle.Bold, TextAnchor.MiddleLeft);
+            var gearHeader = CreateText(panel.transform, "3. CẦN SỐ H (6 công tắc = số 1·2·3·4·5·R; firmware giữ số đã gạt, phím N = về N)", 17, AccentColor, FontStyle.Bold, TextAnchor.MiddleLeft);
             SetRect(gearHeader.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(560, -560), new Vector2(-40, -532));
             gearLearnButton = CreateStyledButton(panel.transform, "Học cần số", 15, () =>
             {
@@ -584,7 +584,7 @@ namespace SimRacing
             SetRect(toMenuBtn.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(1, 1),
                 new Vector2(40, -275), new Vector2(-40, -220));
 
-            var hint = CreateText(card.transform, "Buồng lái: sau khi tiếp tục, về N, nhả ga, giữ phanh rồi nhấn nút ĐỀ (hoặc F9).\nF10 đổi nhanh giữa bàn phím và buồng lái.", 15, TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
+            var hint = CreateText(card.transform, "Buồng lái: sau khi tiếp tục, đạp hết côn, nhả ga, giữ phanh rồi nhấn nút ĐỀ (hoặc F9).\nF10 đổi nhanh giữa bàn phím và buồng lái.", 15, TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
             SetRect(hint.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(20, 20), new Vector2(-20, 85));
         }
 
@@ -801,7 +801,8 @@ namespace SimRacing
             if (rigDiagText)
             {
                 string shifter = r.gearFault ? "LỖI: 2 công tắc cùng chạm"
-                    : r.switchGear == 0 ? "không chạm công tắc nào (N)"
+                    : r.switchGear == 0 ? "chưa gạt số nào (N)"
+                    : rig.NeutralSelected ? $"công tắc U{r.switchGear} đang giữ, phím N → số N"
                     : $"công tắc U{r.switchGear} → số {RigProtocol.GearName(r.gear)}";
                 rigDiagText.text = rig.Connected
                     ? $"Encoder {r.encoder} → lái {r.steer * 100:+0;-0;0}%     Cần số: {shifter}\nKhóa điện {(r.ignition ? "BẬT" : "TẮT")}   ·   Nút đề {(r.starter ? "ĐANG NHẤN" : "nhả")}   ·   Đèn {r.headlights}   ·   Còi {(r.horn ? "kêu" : "—")}   ·   Xi nhan {(r.left ? "trái " : "")}{(r.right ? "phải" : "")}"

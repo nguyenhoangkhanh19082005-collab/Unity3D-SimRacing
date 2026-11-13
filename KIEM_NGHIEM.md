@@ -18,9 +18,11 @@ Game tự chạy khoảng 5 phút rồi tự thoát. Mở `SimRacing-Windows/Ver
 | `settings screen reads the live cockpit` | Màn hình THIẾT LẬP đọc trực tiếp dữ liệu buồng lái (ảnh `01c-settings-cockpit.png`) |
 | `shifting without the clutch is refused` / `clutch pressed engages 1st gear` | Côn thực tế: không đạp côn thì không vào số |
 | `releasing the clutch against the brake stalls` / `engine restarts after a stall` | Chết máy khi phanh dừng mà còn số, đề lại được |
-| `START button on the cockpit takes over` | Phanh + N + nút ĐỀ trên buồng lái là nhận xe, không cần bàn phím |
+| `START button on the cockpit takes over` | Phanh + côn + nút ĐỀ trên buồng lái là nhận xe khi cần số đang giữ số 1 (firmware fix4), không cần bàn phím |
+| `latched 1st gear engages with the clutch after takeover` | Nhận xe xong, số 1 đang giữ vào ngay vì côn đang đạp |
+| `key N selects neutral on a latched shifter` / `pressing the clutch again leaves neutral` | Phím N về N dù firmware vẫn báo số 1; nhả rồi đạp côn lại thì số 1 vào lại |
 
-Các bài kiểm tra giao thức chạy khi build (`ProtocolVerification`) còn kiểm: chiều encoder (tick dương = trái), hiệu chỉnh bàn đạp đấu ngược hoặc hành trình ngắn, bảng cần số, hai công tắc số cùng chạm thì thành N.
+Các bài kiểm tra giao thức chạy khi build (`ProtocolVerification`) còn kiểm: chiều encoder (tick dương = trái), hiệu chỉnh bàn đạp đấu ngược hoặc hành trình ngắn, bảng cần số, hai công tắc số cùng chạm thì thành N, đang có số mà đạp hết côn thì nhận xe được (nhả côn thì không).
 | `grid race spawns player and 5 AI racers` | Lưới xuất phát có 6 xe |
 | `AI racers drive away from the grid` / `stay upright` | Xe AI rời lưới, đi đúng mặt đường, không lật |
 | `standings rank the stationary player last` | Bảng xếp hạng đúng khi bạn đứng yên |
@@ -37,7 +39,8 @@ Các bài kiểm tra giao thức chạy khi build (`ProtocolVerification`) còn 
    - W chạy, S phanh rồi lùi, A/D đánh lái. H bật đèn (tắt → cốt → pha). Xe không có gạt mưa.
 2. Đang lái, nhấn **F10**.
    - Hiện thông báo *Đã chuyển sang BUỒNG LÁI*. Xe bị khóa phanh, HUD báo *CHƯA KẾT NỐI BUỒNG LÁI* (nếu ESP32 chưa gửi) hoặc *BUỒNG LÁI TẠM KHÓA* (nếu đã kết nối). Phím W không còn tác dụng.
-3. Với buồng lái thật đã kết nối (xem [HUONG_DAN_BUONG_LAI.md](HUONG_DAN_BUONG_LAI.md)): bật khóa điện, về N, nhả ga, giữ phanh, nhấn **nút ĐỀ** (hoặc F9), rồi đạp côn, vào số 1 và chạy.
+3. Với buồng lái thật đã kết nối (xem [HUONG_DAN_BUONG_LAI.md](HUONG_DAN_BUONG_LAI.md)) và firmware fix4: bật khóa điện, nhả ga, giữ phanh và côn, nhấn **nút ĐỀ** (hoặc F9), gạt số 1 rồi buông cần, nhả côn từ từ và chạy.
+   - Buông cần số sau khi gạt: HUD vẫn ghi số 1. Phím **N** đưa về N; đạp côn lại thì số 1 vào lại.
    - Vô lăng, bàn đạp, cần số điều khiển xe. Dòng dưới HUD hiện số, % ga/phanh/côn và % lái trực tiếp.
    - Gạt số khi chưa đạp côn: HUD báo *KHÔNG VÀO ĐƯỢC SỐ*. Phanh dừng xe khi còn số mà không đạp côn: *CHẾT MÁY*.
 4. Nhấn **Esc** → nút *Điều khiển: … ⇄ Đổi (F10)* → đổi lại **Bàn phím** → Tiếp tục.

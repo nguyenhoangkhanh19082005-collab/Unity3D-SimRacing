@@ -71,8 +71,12 @@ namespace SimRacing
         public int encoder, throttleADC, brakeADC, clutchADC, gear, switchGear, buttons, headlights;
         public float steer, throttle, brake, clutch, lookX, lookY;
         public bool ignition, starter, hazard, horn, left, right, cameraButton, gearFault;
-        /// <summary>Safe state for handing the car to the cockpit: neutral, throttle released, brake held.</summary>
-        public bool SafeToTakeOver => !gearFault && throttle <= .03f && brake >= .5f && gear == 0;
+        /// <summary>Safe state for handing the car to the cockpit: throttle released, brake held, and either
+        /// neutral or the clutch pressed. Firmware fix4 latches the last gear switch (the shifter's microswitches
+        /// are not held down once the lever is released), so after the first shift the lever never reports N again.</summary>
+        public bool SafeToTakeOver => !gearFault && throttle <= .03f && brake >= .5f && (gear == 0 || clutch >= ClutchIn);
+        /// <summary>Clutch travel that counts as "pressed" for shifting, starting and taking over.</summary>
+        public const float ClutchIn = .6f;
         public bool Ready => SafeToTakeOver && !starter;
         public static RigSample Held => new RigSample { brake = 1, clutch = 1 };
     }

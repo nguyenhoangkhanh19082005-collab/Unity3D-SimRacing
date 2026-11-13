@@ -86,12 +86,23 @@ namespace SimRacing
             Check(app.Car.Recover(false),"stationary recovery");Check(app.Car.Recoveries==1 && app.Rig.Held,"recovery invalidates attempt and holds rig");
             // Control modes: the keyboard mode must ignore a live rig, and switching back to the rig waits for F9
             yield return new WaitForSecondsRealtime(2.1f);
-            // Taking the car back from the cockpit itself: brake held, neutral, press START
+            // Taking the car back from the cockpit itself. Firmware fix4 latches the last gear switch, so the
+            // lever still reports 1st: brake + clutch pressed replaces neutral, then press START
+            throttle=0;brake=clutch=4095;gear=1;yield return new WaitForSecondsRealtime(.2f);
             flags=3;yield return new WaitForSecondsRealtime(.3f);flags=1;
             Check(!app.Rig.Held && app.Car.EngineRunning,"START button on the cockpit takes over");
+            Check(app.Car.Gear==1,"latched 1st gear engages with the clutch after takeover");
+            // Key N: neutral while the firmware still reports 1st; pressing the clutch again re-engages 1st
+            app.Rig.SelectNeutral();yield return new WaitForSecondsRealtime(.2f);
+            Check(app.Rig.NeutralSelected && app.Rig.Raw.gear==0 && app.Car.Gear==0,"key N selects neutral on a latched shifter");
+            clutch=0;yield return new WaitForSecondsRealtime(1f);
+            Check(app.Car.EngineRunning && app.Car.Gear==0,"neutral with the clutch released does not stall");
+            clutch=4095;yield return new WaitForSecondsRealtime(.2f);
+            Check(!app.Rig.NeutralSelected && app.Car.Gear==1,"pressing the clutch again leaves neutral");
             app.SetControl(ControlMode.Keyboard);flags=1;gear=1;clutch=0;brake=0;throttle=4095;
             yield return new WaitForSecondsRealtime(1.5f);
-            Check(app.Car.KeyboardDriving && app.Rig.Held && app.Car.Speed<3,"keyboard mode ignores rig pedals");
+            // Judged on the controls the car receives, not its speed: free-drive traffic may bump the parked car.
+            Check(app.Car.KeyboardDriving && app.Rig.Held && app.Car.Controls.throttle<.01f && app.Rig.Raw.throttle>.9f,"keyboard mode ignores rig pedals");
             app.SetControl(ControlMode.Rig);yield return null;
             Check(!app.Car.KeyboardDriving && app.Rig.Held,"switching to rig mode waits for F9 takeover");
             throttle=0;brake=clutch=4095;gear=0;flags=0;yield return new WaitForSecondsRealtime(.3f);

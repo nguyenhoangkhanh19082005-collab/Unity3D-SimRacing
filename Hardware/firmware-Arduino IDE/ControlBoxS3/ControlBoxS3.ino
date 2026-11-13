@@ -45,6 +45,10 @@ uint8_t commandResult=0;
 int applied=0;
 uint16_t rawThrottle=0,rawBrake=0,rawClutch=0;
 uint8_t fallbackGear=0;
+// The shifter microswitches are only pressed while the lever is pushed into a gate: once the lever is
+// let go they open again. The last gear selected is therefore latched here and kept when no switch (or
+// two switches) is pressed and while the MCP23017 recovers. The game's key N selects neutral.
+uint8_t latchedGear=0;
 int8_t prevJoyShift=0;
 
 void IRAM_ATTR encoderISR() {
@@ -100,14 +104,25 @@ bool findMCP() {
 }
 // Average of 16 ADC samples: the pedal spans in Config.h are only 50-500 counts wide,
 // so single-sample ESP32 ADC noise would otherwise make the pedal % jump.
+// The first conversion after switching ADC channel is discarded.
 int readAvg(int pin) {
+  (void)analogRead(pin);
   uint32_t sum = 0;
   for (int i = 0; i < 16; i++) sum += analogRead(pin);
-  return sum >> 4;
+  return int((sum + 8) / 16);
 }
 uint16_t pedal(int raw,int released,int pressed,uint16_t old) {
-  int normalized=constrain((raw-released)*4095/(pressed-released),0,4095);
-  return (old*3+normalized)/4;
+  const int span=abs(pressed-released);
+  if(span==0) return old;
+  // Distance travelled from RELEASED towards PRESSED, whatever the ADC polarity.
+  const int travelled=(raw-released)*((pressed>released)?1:-1);
+  // Endpoint deadband: ~10% of the travel, 3..8 ADC counts, so a resting pedal reads exactly 0 / 4095.
+  const int deadband=constrain(span/10,3,8);
+  int normalized;
+  if(travelled<=deadband) normalized=0;
+  else if(travelled>=span-deadband) normalized=4095;
+  else normalized=(travelled-deadband)*4095/(span-2*deadband);
+  return uint16_t((uint32_t(old)*7+uint32_t(normalized)+4)/8); // Low-pass: 12.5% new sample.
 }
 bool gameAlive(uint32_t now) { return ethernetOK && haveFeedback && uint32_t(now-lastFeedback)<FEEDBACK_TIMEOUT; }
 bool screenAlive(uint32_t now) { return haveHeartbeat && uint32_t(now-lastHeartbeat)<SCREEN_TIMEOUT; }
@@ -169,9 +184,9 @@ void scanInputs(uint32_t now) {
   uint16_t raw=0;
   bool valid=false;
   if(mcpOK) {
-    // One glitched I2C read must not drop the shifter: give up only after 3 failures in a row.
+    // Glitched I2C reads must not drop the shifter: give up only after 5 failures in a row (25 ms).
     if(readMCP(raw)) { valid=true; mcpFailures=0; }
-    else if(++mcpFailures>=3) { mcpOK=false; Serial0.println("[RIG] MCP23017 mat ket noi -> che do du phong (joystick doi so)"); }
+    else if(++mcpFailures>=5) { mcpOK=false; Serial0.println("[RIG] MCP23017 mat ket noi -> che do du phong (joystick doi so)"); }
   }
   if(!mcpOK) {
     stableSwitches=0; disarm();
@@ -196,7 +211,9 @@ void scanInputs(uint32_t now) {
     // GEAR_PIN (Config.h) says which MCP23017 input (GPA0..GPA5) each gear 1..5,R presses.
     uint16_t gearBits=0;
     for(int g=0; g<6; g++) if(stableSwitches & (1<<GEAR_PIN[g])) gearBits |= 1<<g;
-    input.gear=Rig::decodeGear(gearBits);
+    uint8_t decoded=Rig::decodeGear(gearBits);
+    if(decoded) { latchedGear=decoded; fallbackGear=decoded; } // Exactly one switch pressed: new gear.
+    input.gear=latchedGear; // Lever released (no switch) or between gates (two switches): keep the gear.
     input.reserved[0]=(gearBits && (gearBits&(gearBits-1)))?1:0;
     input.buttons=(stableSwitches>>6)&0x3ff;
     input.buttons &= ~(1<<2);
@@ -208,7 +225,7 @@ void scanInputs(uint32_t now) {
   } else {
     // Fallback mode when MCP23017 is offline: pass real pedals & encoder through!
     // Ignition is kept ON (bit 0 = 1). Pressing the joystick button (GPIO17) gives a 250 ms starter pulse.
-    // Moving joystick Y full up/down (>3300 or <800) also shifts up/down.
+    // Moving joystick Y full up/down (>3300 or <800) also shifts up/down, starting from the latched gear.
     input.reserved[0]=0;
     int8_t shiftDir = (input.joyY > 3300) ? 1 : (input.joyY < 800) ? -1 : 0;
     if(shiftDir != 0 && prevJoyShift == 0) {
@@ -221,11 +238,12 @@ void scanInputs(uint32_t now) {
         else fallbackGear--;
       }
     }
+    if(shiftDir != 0 && prevJoyShift == 0) latchedGear = fallbackGear;
     prevJoyShift = shiftDir;
     if(joyChanged && joy.stable) {
       starterUntil = now + 250;
     }
-    input.gear = fallbackGear;
+    input.gear = latchedGear;
     input.buttons = 1; // Ignition ON
     if(hazard) input.buttons |= (1<<2);
     if(starterUntil && int32_t(starterUntil-now)>0) input.buttons |= (1<<1);
@@ -265,7 +283,7 @@ void setup() {
   uint32_t previousStage=lastStage; lastStage=ST_BOOT;
   Serial0.setTxBufferSize(512);
   Serial0.begin(115200,SERIAL_8N1,44,43);
-  Serial0.printf("\n[RIG fix3] reset=%d previousStage=%lu FFB=%d\n",int(esp_reset_reason()),(unsigned long)previousStage,int(ENABLE_FFB));
+  Serial0.printf("\n[RIG fix4] reset=%d previousStage=%lu FFB=%d\n",int(esp_reset_reason()),(unsigned long)previousStage,int(ENABLE_FFB));
   dash.setRxBufferSize(512); dash.begin(115200,SERIAL_8N1,DASH_RX,DASH_TX);
   analogReadResolution(12); analogSetAttenuation(ADC_11db);
   pinMode(JOY_BUTTON,INPUT_PULLUP);

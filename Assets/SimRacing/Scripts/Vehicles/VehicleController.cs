@@ -208,7 +208,7 @@ namespace SimRacing
                 else if (input.starter && !EngineRunning)
                 {
                     // Like a real manual car: crank only in neutral or with the clutch pressed.
-                    if (manualClutch && Gear != 0 && input.clutch < .6f) ShowHint("Đạp hết CÔN (hoặc về số N) rồi mới đề máy");
+                    if (manualClutch && Gear != 0 && input.clutch < .6f) ShowHint("Đạp hết CÔN (hoặc phím N về số N) rồi mới đề máy");
                     else { EngineRunning = true; stallClock = 0; }
                 }
             }
@@ -226,7 +226,7 @@ namespace SimRacing
             // or trying to pull away in 3rd-5th without gas).
             if(manualClutch && EngineRunning && !holding && Gear!=0 && engagement>.85f && Speed<2.5f
                && (input.brake>.25f || (Gear>=3 && Gear<=5 && input.throttle<.5f))) stallClock+=dt; else stallClock=0;
-            if(stallClock>.7f) { EngineRunning=false; stallClock=0; ShowHint("CHẾT MÁY • Đạp côn (hoặc về N) rồi nhấn ĐỀ để nổ máy lại", 4); }
+            if(stallClock>.7f) { EngineRunning=false; stallClock=0; ShowHint("CHẾT MÁY • Đạp hết côn (hoặc phím N) rồi nhấn ĐỀ để nổ máy lại", 4); }
             // Idle creep: in 1st or reverse with the clutch up and no brake, an idling engine moves the car slowly.
             float drive=input.throttle;
             if(manualClutch && EngineRunning && (Gear==1 || Gear==6) && Speed<6 && input.brake<.1f) drive=Mathf.Max(drive,.1f);
