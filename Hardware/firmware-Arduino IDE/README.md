@@ -1,5 +1,7 @@
 # Bộ firmware SimRacing: S3 Control Box + WROOM32 Touchscreen
 
+**Cập nhật fix3:** `GEAR_PIN` trong Config.h (số 1,2,3,4,5,R = GPA0,3,1,4,2,5 theo đo thực tế) và dải biến trở đo được của ga/phanh/côn; đọc ADC trung bình 16 mẫu. Sau khi nạp fix3: trong game để bảng cần số ở *Mặc định* và hiệu chỉnh lại bàn đạp nếu đã hiệu chỉnh bằng firmware cũ.
+
 **Cập nhật 13/11/2026 (fix2):** gửi broadcast tới khi game trả lời rồi gửi thẳng tới IP của game, nhận phản hồi từ mọi máy trong 192.168.1.x, tự dò lại MCP23017 mỗi giây (thử cả SDA/SCL đảo), bỏ qua lỗi I2C đơn lẻ. Hướng dẫn vận hành: `HUONG_DAN_BUONG_LAI.md` ở gốc repo.
 
 **Cập nhật 13/10/2026:** đã sửa watchdog khi W5500/socket chưa khởi tạo và nạp thử S3. Xem [kết quả đo và các điểm phải sửa trên sơ đồ](../docs/SUA_LOI_DAU_NOI_S3.md). Log chẩn đoán hiện xuất qua UART0/CH343 115200; motor vẫn khóa.
@@ -33,7 +35,7 @@ S3 là nơi duy nhất đọc/chuẩn hóa phần cứng và điều khiển dri
 |---|---|---|
 | PR1 / PR2 / PR3 | Côn / phanh / ga, ADC 12 bit, lọc IIR, hiệu chỉnh đầu-cuối | Côn / phanh / ga tương ứng |
 | Encoder A/B | Đọc đủ 4 cạnh, loại chuyển trạng thái bất hợp lệ | Lái trái/phải; dương = trái theo Godot |
-| U1…U5 / U6 | Chỉ một tiếp điểm đóng; không đóng = N | Số 1…5 / R; mã 6 luôn là lùi |
+| U1…U6 (GPA theo `GEAR_PIN`) | Chỉ một tiếp điểm đóng; không đóng = N | Số 1…5 / R; mã 6 luôn là lùi |
 | Hai tiếp điểm số cùng đóng | Chuyển N + báo lỗi + khóa FFB | Không tự đoán một số bất kỳ |
 | Ignition GPA6 | Công tắc duy trì, mức đóng = bật điện | Tắt công tắc tắt máy; bật điện rồi START để đề |
 | Start GPA7 / START cảm ứng | Nút vật lý giữ mức; cảm ứng tạo xung 250 ms | Đề máy; đạp ga không tự đề khi dùng rig |
@@ -68,7 +70,7 @@ VDD pin 9 = 3V3, VSS pin 10 = GND, A0/A1/A2 xuống GND. SCL pin 12 -> GPIO8; SD
 
 | MCP23017 | Thiết bị | Bit trong buttons_mask |
 |---|---|---:|
-| GPA0…GPA5 | U1…U6: 1,2,3,4,5,R | Không thuộc buttons_mask |
+| GPA0…GPA5 | Cần số, ánh xạ bằng `GEAR_PIN` (hiện: 1=GPA0, 2=GPA3, 3=GPA1, 4=GPA4, 5=GPA2, R=GPA5) | Không thuộc buttons_mask |
 | GPA6 | Ignition | 0 |
 | GPA7 | Start | 1 |
 | GPB0 | Hazard nhấn nhả | 2, đã chốt trạng thái |

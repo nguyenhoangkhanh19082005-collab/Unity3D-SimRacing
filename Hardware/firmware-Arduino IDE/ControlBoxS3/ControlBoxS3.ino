@@ -98,6 +98,13 @@ bool findMCP() {
   probeI2C(I2C_SDA,I2C_SCL);
   return false;
 }
+// Average of 16 ADC samples: the pedal spans in Config.h are only 50-500 counts wide,
+// so single-sample ESP32 ADC noise would otherwise make the pedal % jump.
+int readAvg(int pin) {
+  uint32_t sum = 0;
+  for (int i = 0; i < 16; i++) sum += analogRead(pin);
+  return sum >> 4;
+}
 uint16_t pedal(int raw,int released,int pressed,uint16_t old) {
   int normalized=constrain((raw-released)*4095/(pressed-released),0,4095);
   return (old*3+normalized)/4;
@@ -177,7 +184,7 @@ void scanInputs(uint32_t now) {
     }
   }
   input.timestamp=now; input.encoder=readEncoder();
-  rawThrottle=analogRead(PEDAL_THROTTLE); rawBrake=analogRead(PEDAL_BRAKE); rawClutch=analogRead(PEDAL_CLUTCH);
+  rawThrottle=readAvg(PEDAL_THROTTLE); rawBrake=readAvg(PEDAL_BRAKE); rawClutch=readAvg(PEDAL_CLUTCH);
   input.throttle=pedal(rawThrottle,THROTTLE_RELEASED,THROTTLE_PRESSED,input.throttle);
   input.brake=pedal(rawBrake,BRAKE_RELEASED,BRAKE_PRESSED,input.brake);
   input.clutch=pedal(rawClutch,CLUTCH_RELEASED,CLUTCH_PRESSED,input.clutch);
@@ -186,8 +193,10 @@ void scanInputs(uint32_t now) {
   input.joyButton=joy.stable;
 
   if(mcpOK) {
-    input.gear=Rig::decodeGear(stableSwitches);
-    uint16_t gearBits=stableSwitches&63;
+    // GEAR_PIN (Config.h) says which MCP23017 input (GPA0..GPA5) each gear 1..5,R presses.
+    uint16_t gearBits=0;
+    for(int g=0; g<6; g++) if(stableSwitches & (1<<GEAR_PIN[g])) gearBits |= 1<<g;
+    input.gear=Rig::decodeGear(gearBits);
     input.reserved[0]=(gearBits && (gearBits&(gearBits-1)))?1:0;
     input.buttons=(stableSwitches>>6)&0x3ff;
     input.buttons &= ~(1<<2);
@@ -256,7 +265,7 @@ void setup() {
   uint32_t previousStage=lastStage; lastStage=ST_BOOT;
   Serial0.setTxBufferSize(512);
   Serial0.begin(115200,SERIAL_8N1,44,43);
-  Serial0.printf("\n[RIG fix2] reset=%d previousStage=%lu FFB=%d\n",int(esp_reset_reason()),(unsigned long)previousStage,int(ENABLE_FFB));
+  Serial0.printf("\n[RIG fix3] reset=%d previousStage=%lu FFB=%d\n",int(esp_reset_reason()),(unsigned long)previousStage,int(ENABLE_FFB));
   dash.setRxBufferSize(512); dash.begin(115200,SERIAL_8N1,DASH_RX,DASH_TX);
   analogReadResolution(12); analogSetAttenuation(ADC_11db);
   pinMode(JOY_BUTTON,INPUT_PULLUP);

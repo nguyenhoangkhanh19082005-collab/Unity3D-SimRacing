@@ -34,7 +34,8 @@ Cần số trong bản vẽ 3D (chi tiết `HVitesV4`, tiếng Thổ Nhĩ Kỳ n
 ```
 
 - **Không chạm công tắc nào = N.** Đây là vị trí bắt buộc khi nổ máy và khi nhận xe.
-- Công tắc U1…U6 nối vào GPA0…GPA5 của MCP23017. Firmware gửi "đang chạm công tắc số mấy" (1…6). Game dịch số đó thành số xe qua **bảng cần số**. Nhờ vậy, đấu dây theo thứ tự nào cũng được: chỉ cần chạy **Học cần số** một lần (mục 4.3).
+- Công tắc U1…U6 nối vào GPA0…GPA5 của MCP23017. Bảng `GEAR_PIN` trong `Config.h` ghi số nào chạm chân GPA nào. Trên buồng lái hiện tại đã đo được: số 1 = GPA0, số 2 = GPA3, số 3 = GPA1, số 4 = GPA4, số 5 = GPA2, R = GPA5. Firmware gửi thẳng số 1…5 / 6 = R cho game.
+- Game còn có **bảng cần số** riêng (mục 4.3). Nếu đã sửa `GEAR_PIN` trong firmware thì để bảng của game ở **Mặc định**, đừng ánh xạ hai lần.
 - Nếu hai công tắc cùng chạm (cần nằm lệch giữa hai rãnh, hoặc công tắc bị dội), game coi là N và báo *lỗi 2 công tắc*.
 
 Khi bật tùy chọn **Côn thực tế** (mặc định), game xử lý như xe số sàn thật:
@@ -57,13 +58,13 @@ Tắt **Côn thực tế** trong THIẾT LẬP nếu muốn lái dễ hơn (khi 
    - Script đặt IP tĩnh **192.168.1.100/24** cho card LAN bạn chọn, rồi ping thử control box `192.168.1.150`.
 4. Khi không lái nữa và cần card LAN vào Internet qua router, chạy lại script và chọn **[3]** để trả card về IP tự động.
 
-> Firmware mới (`[RIG fix2]`) gửi dữ liệu dạng broadcast cho tới khi game trả lời, nên game nhận được dù IP máy tính không chính xác là `.100`. Tường lửa thì vẫn bắt buộc phải mở. Firmware cũ chỉ gửi tới đúng `192.168.1.100`.
+> Firmware mới (`[RIG fix2]` trở lên) gửi dữ liệu dạng broadcast cho tới khi game trả lời, nên game nhận được dù IP máy tính không chính xác là `.100`. Tường lửa thì vẫn bắt buộc phải mở. Firmware cũ chỉ gửi tới đúng `192.168.1.100`.
 
 ## 3. Nạp firmware ESP32-S3
 
 1. Mở `Hardware/firmware-Arduino IDE/ControlBoxS3/ControlBoxS3.ino` bằng Arduino IDE (core **esp32 3.3.x**). Cài thư viện **Ethernet** (Arduino).
 2. Board **ESP32S3 Dev Module**, chọn đúng cổng COM, rồi Upload.
-3. Mở **Serial Monitor 115200** (cổng USB-UART CH343). Sau khi khởi động sẽ thấy `[RIG fix2] ...` và mỗi giây một dòng trạng thái:
+3. Mở **Serial Monitor 115200** (cổng USB-UART CH343). Sau khi khởi động sẽ thấy `[RIG fix3] ...` và mỗi giây một dòng trạng thái:
 
 ```
 [RIG] ms=… chip=1 ver=04 i2c=01 link=1 udp=1 mcp=1 tx=… fail=0 dst=game game=1 enc=… adc=…/…/… out=…/…/… gear=0 sw=0040 btn=001
@@ -94,6 +95,8 @@ Mở game → **THIẾT LẬP**. Cột phải là khu **BUỒNG LÁI**. Dòng đ
 Mặc định là ±3000 ticks (±450°, tức 900° từ hết trái tới hết phải), ứng với encoder 600 xung × 4. Thanh trượt dùng để chỉnh tay nếu muốn.
 
 ### 4.2 Bàn đạp
+Firmware fix3 đã quy đổi bàn đạp theo dải đo trong `Config.h` (`*_RELEASED` / `*_PRESSED`), nên game nhận 0…4095 cho cả ba. Trong game, chỉ cần hiệu chỉnh lại nếu % chưa về 0 khi nhả hoặc chưa lên 100% khi đạp hết. **Nếu trước đó đã hiệu chỉnh trong game bằng firmware cũ (giá trị thô), hãy làm lại bước này sau khi nạp fix3.**
+
 1. Bấm **Bắt đầu hiệu chỉnh**.
 2. Đạp **hết** từng bàn đạp 2–3 lần (ga, phanh, côn). Dòng *Hành trình đã ghi* phải vượt 300 cho cả ba.
 3. **Nhả hết** cả ba bàn đạp → bấm **Xong (đã nhả hết)**.
@@ -101,6 +104,8 @@ Mặc định là ±3000 ticks (±450°, tức 900° từ hết trái tới hế
 Sau đó dòng *GA / PHANH / CÔN* phải về **0%** khi nhả và lên **100%** khi đạp hết. Biến trở đấu ngược chiều hoặc chỉ xoay được một phần hành trình vẫn hiệu chỉnh được.
 
 ### 4.3 Cần số
+Với firmware fix3 (`GEAR_PIN` đã đúng) chỉ cần bấm **Mặc định**, rồi gạt thử: dòng *Cần số: công tắc U… → số …* phải ra đúng số đang gạt. Chỉ dùng **Học cần số** khi không muốn sửa firmware:
+
 1. Bấm **Học cần số**.
 2. Làm theo chữ trên màn hình: gạt cần lần lượt vào **1, 2, 3, 4, 5, R**, giữ yên mỗi số khoảng nửa giây.
 3. Game lưu bảng, ví dụ `U1→1  U2→2 … U6→R`. Dòng *Cần số: công tắc U… → số …* cho thấy kết quả ngay.
