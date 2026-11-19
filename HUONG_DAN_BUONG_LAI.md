@@ -134,7 +134,9 @@ Với firmware fix3 (`GEAR_PIN` đã đúng) chỉ cần bấm **Mặc định**
 
 **Số tự động (mặc định):**
 
-3. Nhận xe: **bật khóa điện** → **đạp phanh** quá nửa → **nhả ga** → nhấn **nút ĐỀ** trên buồng lái (hoặc F9). Xe mở khóa, đếm ngược và nổ máy. Cần số đang ở số nào cũng được.
+3. Nhận xe: **bật khóa điện** → **đạp phanh** quá nửa → **nhả ga** → nhấn **nút ĐỀ** trên buồng lái (hoặc F9). Xe mở khóa, đếm ngược 3 giây rồi **tự nổ máy**, không cần nhấn ĐỀ lần nữa. Cần số đang ở số nào cũng được. Nếu máy tắt khi đang lái, nhấn ĐỀ hoặc F9 để nổ lại.
+   - Máy chỉ chạy khi **khóa điện BẬT**. Dòng *KHÓA ĐIỆN* dưới HUD phải ghi BẬT. Nếu ghi TẮT dù đã bật công tắc, kiểm tra dây công tắc khóa điện (GPA6 của MCP23017).
+   - Dòng chữ giữa HUD luôn ghi lý do xe chưa chạy được: *KHÓA ĐIỆN đang TẮT*, *MÁY CHƯA NỔ*, *Đang ở số N*…
 4. Đi: gạt cần vào **số 1** (hoặc 2…5, đều là D; buông cần được) → nhả phanh → đạp **ga**. Hộp số tự lên số.
 5. Dừng: nhả ga, đạp phanh. Không chết máy.
 6. Lùi: dừng hẳn → gạt **R** → nhả phanh, đạp ga. Đi tới lại: dừng hẳn → gạt số 1.
@@ -159,6 +161,8 @@ Các công tắc khác: **Khóa điện** (GPA6) tắt thì máy tắt. **Đèn*
 | Quay vô lăng phải mà xe rẽ trái, hoặc lái quá nhẹ | Làm mục 4.1 |
 | Gạt số mà game ra số khác | Làm mục 4.3 |
 | Vào số rồi buông tay là game về N, xe không đi | Firmware cũ không giữ số: nạp firmware **fix5** (Serial Monitor in `[RIG fix5]`) |
+| Nhấn F9, vào số 1 mà xe không chạy | Đọc dòng chữ giữa HUD. *KHÓA ĐIỆN đang TẮT*: bật khóa điện (hoặc sửa dây công tắc GPA6). *MÁY CHƯA NỔ*: nhấn ĐỀ hoặc F9. Vẫn *BUỒNG LÁI ĐANG KHÓA*: F9 bị từ chối, đọc lý do (thường là ga chưa về 0% hoặc phanh chưa quá 50%) |
+| % ga / phanh nhảy liên tục | Biến trở ga trên buồng lái chỉ xoay được ~50 đơn vị ADC (Config.h: 4095→4045, lại nằm ở mức bão hòa 4095), nên mỗi đơn vị ≈ 2%. Game đã lọc thêm và coi dưới 3% là 0%, nhưng muốn hết hẳn phải chỉnh cơ khí cho biến trở xoay nhiều hơn (lý tưởng vài trăm đơn vị ADC) rồi đo lại `adc=` trên Serial Monitor và sửa `THROTTLE_RELEASED/PRESSED`. Nạp firmware fix5 (có bộ lọc) |
 | Đã nổ máy, vào số mà xe không chạy | Xem dòng *CẦN SỐ* dưới HUD. Ghi N thì đọc dòng dưới. Có số mà vẫn không chạy: THIẾT LẬP phải để **tắt** *Dùng chân côn* (côn gắn chết sẽ luôn cắt truyền động), và kiểm tra *GA* có lên khi đạp |
 | Gạt số mà game luôn N | Đang ở N do phím N (nhấn N lần nữa), chưa đạp côn khi bật *Dùng chân côn*, đang ở N do phím N (đạp côn lại hoặc gạt số khác), hoặc `mcp=0` trên Serial Monitor (MCP23017 chưa trả lời: kiểm tra 3V3, GND, SDA=GPIO18, SCL=GPIO8, RESET# kéo lên 3V3) |
 | Nhấn ĐỀ mà máy không nổ | Khóa điện đang TẮT, hết xăng, hoặc (chỉ khi bật *Dùng chân côn*) đang có số mà chưa đạp côn |

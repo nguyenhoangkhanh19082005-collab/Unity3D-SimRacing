@@ -49,6 +49,9 @@ namespace SimRacing
             yield return new WaitForSecondsRealtime(.5f);Check(app.Rig.Connected && app.Rig.Held,"new rig remains held");
             app.Rig.SendMessage("OnApplicationFocus",true);Check(app.Rig.Resume(),"neutral + brake explicitly resumes");
             yield return new WaitForSecondsRealtime(3.5f);Check(app.Session.Active,"countdown starts session");
+            // Automatic: F9 takeover also cranks the engine once the ignition is on (no START press needed)
+            Check(!app.Car.EngineRunning && app.Car.Hint!="","engine off with the ignition off is explained on the HUD");
+            flags=1;yield return new WaitForSecondsRealtime(.3f);Check(app.Car.EngineRunning,"automatic: F9 takeover starts the engine");
             flags=3;yield return new WaitForSecondsRealtime(.5f);flags=1;Check(app.Car.EngineRunning,"ignition and starter start engine");
             // Automatic gearbox (default; the rig's clutch pedal is glued): START, lever to 1 = D, throttle, go.
             // The clutch reads fully pressed here and must not stop the car from driving.
@@ -65,7 +68,7 @@ namespace SimRacing
             // The rest of this drive checks the optional manual gearbox ("Dùng chân côn")
             app.Rig.calibration.useClutchPedal=true;yield return new WaitForSecondsRealtime(.1f);
             // Manual gearbox: moving the lever into 1st with the clutch up is refused (the box stays in N)
-            clutch=0;gear=1;yield return new WaitForSecondsRealtime(.3f);
+            clutch=0;yield return new WaitForSecondsRealtime(.2f);gear=1;yield return new WaitForSecondsRealtime(.3f);
             Check(app.Car.Gear==0 && app.Car.Hint!="" && app.Car.EngineRunning,"shifting without the clutch is refused");
             // Real launch: clutch down, 1st gear, then clutch up with throttle
             clutch=4095;yield return new WaitForSecondsRealtime(.3f);Check(app.Car.Gear==1,"clutch pressed engages 1st gear");

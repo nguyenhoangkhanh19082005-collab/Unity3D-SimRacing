@@ -64,6 +64,7 @@ namespace SimRacing
             if (lease && (!sender.Equals(remote) || !RigProtocol.Newer(sample.stamp, lastStamp))) return false;
             if (!lease) Held = true;
             ApplyNeutral(ref sample);
+            SmoothPedals(ref sample, lease ? now - lastPacket : -1);
             lastStamp = sample.stamp; Raw = sample; remote = sender; lastPacket = now; count++; Error = "";
             if (PedalCalibrating) TrackPedals(sample);
             return true;
@@ -85,7 +86,8 @@ namespace SimRacing
             if (wasConnected && !connected) { SendFeedback(0, 0, 0, 0, 0, false, false, 0); remote = null; Raw = RigSample.Held; }
             wasConnected = connected;
             if (!connected && Clock - addressCheck > 3) RefreshAddresses();
-            if (Input.GetKeyDown(KeyCode.F9)) Resume();
+            // F9: take the car over; while already driving in automatic it cranks the engine (backup for the START button).
+            if (Input.GetKeyDown(KeyCode.F9)) { if (!Held && connected && !calibration.useClutchPedal) StartRequested = true; else Resume(); }
             if (InUse && connected && Input.GetKeyDown(KeyCode.N)) ToggleNeutral();
             // Taking the car from the cockpit itself: brake held, neutral, throttle released, then press START.
             bool starter = connected && Raw.starter;
@@ -141,14 +143,34 @@ namespace SimRacing
             else if (s.clutch >= RigSample.ClutchIn && neutralClutchReleased) { neutralSwitch = 0; return; }
             s.gear = 0;
         }
-        public void Hold() { Held = true; }
+        public void Hold() { Held = true; StartRequested = false; }
+        /// <summary>Automatic gearbox: taking the car over (F9 or START), or F9 while driving, also cranks the
+        /// engine, so the driver only has to put the lever in gear. Consumed by the car once the countdown ends.</summary>
+        public bool StartRequested { get; private set; }
+        public bool ConsumeStart() { bool s = StartRequested; StartRequested = false; return s; }
+
+        // ---------- Pedal smoothing ----------
+        // The throttle potentiometer only moves ~50 ADC counts on the current rig, so one count is ~2% and the
+        // reading flickers even after the firmware filter. A 40 ms low-pass plus a 3% rest band at each end keeps
+        // a released pedal at exactly 0% (so takeover is not refused) without making the pedals feel slow.
+        float smoothThrottle, smoothBrake, smoothClutch;
+        const float PedalTau = .04f, PedalRest = .03f;
+        void SmoothPedals(ref RigSample s, double dt)
+        {
+            float a = dt < 0 ? 1 : 1 - Mathf.Exp(-(float)dt / PedalTau);
+            smoothThrottle += (s.throttle - smoothThrottle) * a;
+            smoothBrake += (s.brake - smoothBrake) * a;
+            smoothClutch += (s.clutch - smoothClutch) * a;
+            s.throttle = Rest(smoothThrottle); s.brake = Rest(smoothBrake); s.clutch = Rest(smoothClutch);
+        }
+        static float Rest(float x) => x < PedalRest ? 0 : x > 1 - PedalRest ? 1 : (x - PedalRest) / (1 - 2 * PedalRest);
         /// <summary>F9: hand the car to the cockpit when it is in a safe state.</summary>
         public bool Resume() => TakeOver(false);
         bool TakeOver(bool fromStarter)
         {
             if (!Held || Paused || !Focused || !Connected || Calibrating || VehicleSpeed() > 1) return false;
             if (fromStarter ? !Raw.SafeToTakeOver : !Raw.Ready) return false;
-            Held = false; return true;
+            Held = false; StartRequested = !calibration.useClutchPedal; return true;
         }
         /// <summary>Why the cockpit is still held, in words the driver can act on.</summary>
         public string Blocker
@@ -161,7 +183,7 @@ namespace SimRacing
                 var r = Raw; var need = new List<string>();
                 if (r.gearFault) need.Add("cần số chạm 2 công tắc cùng lúc");
                 else if (!r.automatic && r.gear != 0 && r.clutch < RigSample.ClutchIn) need.Add($"đạp hết côn (đang ở số {RigProtocol.GearName(r.gear)}; hoặc phím N về số N)");
-                if (r.throttle > .03f) need.Add($"nhả ga (đang {r.throttle * 100:0}%)");
+                if (r.throttle > .05f) need.Add($"nhả ga (đang {r.throttle * 100:0}%)");
                 if (r.brake < .5f) need.Add($"đạp phanh quá nửa (đang {r.brake * 100:0}%)");
                 if (VehicleSpeed() > 1) need.Add("dừng hẳn xe");
                 if (need.Count == 0) return "Sẵn sàng · bật khóa điện rồi nhấn nút ĐỀ (Start) trên buồng lái, hoặc F9";

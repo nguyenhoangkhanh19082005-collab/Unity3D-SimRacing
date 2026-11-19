@@ -78,7 +78,7 @@ namespace SimRacing
         /// <summary>Safe state for handing the car to the cockpit: throttle released, brake held, and either
         /// neutral or the clutch pressed. Firmware fix4 latches the last gear switch (the shifter's microswitches
         /// are not held down once the lever is released), so after the first shift the lever never reports N again.</summary>
-        public bool SafeToTakeOver => !gearFault && throttle <= .03f && brake >= .5f && (automatic || gear == 0 || clutch >= ClutchIn);
+        public bool SafeToTakeOver => !gearFault && throttle <= .05f && brake >= .5f && (automatic || gear == 0 || clutch >= ClutchIn);
         /// <summary>Clutch travel that counts as "pressed" for shifting, starting and taking over.</summary>
         public const float ClutchIn = .6f;
         public bool Ready => SafeToTakeOver && !starter;

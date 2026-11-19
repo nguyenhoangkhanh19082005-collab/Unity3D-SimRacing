@@ -16,6 +16,7 @@ Game tự chạy khoảng 5 phút rồi tự thoát. Mở `SimRacing-Windows/Ver
 | `keyboard mode ignores rig pedals` | Ở chế độ bàn phím, đạp ga trên buồng lái không làm xe chạy |
 | `switching to rig mode waits for F9 takeover` | Đổi sang buồng lái thì xe bị khóa cho tới khi nhận xe (F9 hoặc nút ĐỀ) |
 | `settings screen reads the live cockpit` | Màn hình THIẾT LẬP đọc trực tiếp dữ liệu buồng lái (ảnh `01c-settings-cockpit.png`) |
+| `engine off with the ignition off is explained on the HUD` / `automatic: F9 takeover starts the engine` | Nhận xe bằng F9 rồi bật khóa điện là máy tự nổ, không cần nút ĐỀ; khóa điện tắt thì HUD ghi rõ |
 | `automatic: lever 1 engages D with the clutch ignored` | Số tự động (mặc định): côn báo đạp hết (như bị keo) mà vẫn vào D |
 | `automatic: car drives off without the clutch` / `gearbox shifts up by itself` | Nổ máy, gạt số 1, đạp ga là chạy, hộp số tự lên số |
 | `automatic: braking to a stop in D does not stall` / `R reverses` | Phanh dừng ở D không chết máy, R lùi được |
