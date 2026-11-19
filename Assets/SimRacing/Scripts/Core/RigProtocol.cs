@@ -21,9 +21,11 @@ namespace SimRacing
         // gearMap[n] = game gear for firmware switch n (1..6 = U1..U6). Game gears: 0 = N, 1..5, 6 = R.
         // Recorded by "Học cần số" so the six shifter switches may be wired in any order.
         public int[] gearMap = { 0, 1, 2, 3, 4, 5, 6 };
-        // Manual gearbox realism: a gear only engages with the clutch pressed, and the engine stalls when
-        // the car is held still in gear with the clutch released.
-        public bool manualClutch = true;
+        // false (default) = automatic: the clutch pedal is ignored, the lever's 1..5 mean D and the gearbox
+        // shifts by itself, R reverses. true = manual box: a gear only engages with the clutch pressed and the
+        // engine stalls when the car is held still in gear with the clutch released. (New field name, so files
+        // saved with the old manualClutch=true option start in automatic.)
+        public bool useClutchPedal;
         public bool Valid => version == 2 && Finite(steeringCenterTicks) && Between(steeringHalfRangeTicks, 300, 20000)
             && Between(steeringDeadzone, 0, .25f) && Between(pedalDeadzone, 0, .25f)
             && Between(ffbStrength, 0, 1) && Between(ffbLimit, .1f, 1)
@@ -71,10 +73,12 @@ namespace SimRacing
         public int encoder, throttleADC, brakeADC, clutchADC, gear, switchGear, buttons, headlights;
         public float steer, throttle, brake, clutch, lookX, lookY;
         public bool ignition, starter, hazard, horn, left, right, cameraButton, gearFault;
+        /// <summary>Automatic gearbox (clutch pedal not used): any gear position is safe to take over with the brake held.</summary>
+        public bool automatic;
         /// <summary>Safe state for handing the car to the cockpit: throttle released, brake held, and either
         /// neutral or the clutch pressed. Firmware fix4 latches the last gear switch (the shifter's microswitches
         /// are not held down once the lever is released), so after the first shift the lever never reports N again.</summary>
-        public bool SafeToTakeOver => !gearFault && throttle <= .03f && brake >= .5f && (gear == 0 || clutch >= ClutchIn);
+        public bool SafeToTakeOver => !gearFault && throttle <= .03f && brake >= .5f && (automatic || gear == 0 || clutch >= ClutchIn);
         /// <summary>Clutch travel that counts as "pressed" for shifting, starting and taking over.</summary>
         public const float ClutchIn = .6f;
         public bool Ready => SafeToTakeOver && !starter;
@@ -114,7 +118,9 @@ namespace SimRacing
             s.steer = c.SteeringFromTicks(s.encoder);
             s.throttle = c.Throttle(s.throttleADC);
             s.brake = c.Brake(s.brakeADC);
-            s.clutch = c.Clutch(s.clutchADC);
+            // Automatic mode: the clutch pedal (glued in place on the current rig) never reaches the car.
+            s.automatic = !c.useClutchPedal;
+            s.clutch = s.automatic ? 0 : c.Clutch(s.clutchADC);
             s.switchGear = b[18]; s.gear = c.Gear(s.switchGear); int mask = U16(b, 19); s.buttons = mask;
             s.ignition = (mask & 1) != 0; s.starter = (mask & 2) != 0; s.hazard = (mask & 4) != 0;
             s.headlights = (mask & 16) != 0 ? 2 : (mask & 8) != 0 ? 1 : 0;

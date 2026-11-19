@@ -1,10 +1,11 @@
 {
   "config/TFT_eSPI_User_Setup.h": "15f9e4714a2a14a0b200b5cabf772b873781611f4b7d6ee803acfa1b19c5d1ee",
+  "ControlBoxS3/AdcFilter.h": "10b23cd2ab3b1372fd843558907883f4ecbe0039cdb8c750464207476418bf5e",
   "ControlBoxS3/Config.h": "273787a2b695306089c76db465d1e659c03f4dd83004914c21acf61d1ec625f2",
-  "ControlBoxS3/ControlBoxS3.ino": "b52e1866730bf11a4416f50069d8d0b56eaf49dca339bacab2d8346ae1b90632",
+  "ControlBoxS3/ControlBoxS3.ino": "c0d388cd2e81c638072855c9f8eeac62adeb58347a8a7f1fff00370cb4ff6bae",
   "ControlBoxS3/RigProtocol.h": "01d32805ee31e4460d552b2aa3d149fab49a1ead803b07c5ad4ac35b9336a9ab",
   "manhinhcamung.ino": "9398ae771c03eb1648ae456df3349c98dd08e6f809dc8c6255ce5f652701242c",
-  "README.md": "dfb6d32e14b3df221a53571d6ca63fe84b83bef42f76dac91486594826bb4f3f",
+  "README.md": "26b54c911592d630a3707cdbf8aed4bd847b2e0fc9853deeb7db882a129e4764",
   "tests/protocol_test.cpp": "e5e1d37d30671a459ac08962afa10895bca035923369542b1e4f49fc9b7e3c34",
   "TouchscreenWroom/Config.h": "8ce57704ba37ea02d81afe7375fc20674879742568e00fc0a41a04c98033a54b",
   "TouchscreenWroom/RigProtocol.h": "01d32805ee31e4460d552b2aa3d149fab49a1ead803b07c5ad4ac35b9336a9ab",

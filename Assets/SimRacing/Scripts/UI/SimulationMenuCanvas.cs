@@ -428,7 +428,7 @@ namespace SimRacing
             var info1 = CreateText(panel.transform, "Chế độ điều khiển (Bàn phím / Buồng lái thật) chọn ở màn hình chính, đổi khi đang lái bằng F10.", 16, TextInk, FontStyle.Normal, TextAnchor.MiddleLeft);
             SetRect(info1.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -340), new Vector2(520, -290));
 
-            var info2 = CreateText(panel.transform, "Lái bằng buồng lái: bật KHÓA ĐIỆN → đạp phanh + đạp hết côn, nhả ga → nhấn nút ĐỀ (hoặc F9) để nhận xe và nổ máy. Khởi hành: giữ côn, gạt số 1, nhả côn từ từ và thêm ga. Mỗi lần sang số đều phải đạp côn. Cần số tự giữ số đã gạt; phím N đưa về số N (hết N khi gạt số khác hoặc đạp côn lại). Dừng xe: đạp côn + phanh (hoặc phím N).", 15, TextMuted, FontStyle.Normal, TextAnchor.UpperLeft);
+            var info2 = CreateText(panel.transform, "Lái bằng buồng lái: bật KHÓA ĐIỆN → đạp phanh, nhả ga → nhấn nút ĐỀ (hoặc F9) để nhận xe và nổ máy → gạt số 1…5 (= D, tự lên xuống số) hoặc R → nhả phanh, đạp ga. Mặc định là SỐ TỰ ĐỘNG, không dùng côn. Phím N bật/tắt số N. Bật «Dùng chân côn» nếu muốn lái số sàn.", 15, TextMuted, FontStyle.Normal, TextAnchor.UpperLeft);
             SetRect(info2.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -520), new Vector2(520, -355));
 
             // Right column: physical cockpit (ESP32) diagnostics and the three calibration wizards
@@ -479,7 +479,7 @@ namespace SimRacing
                 if (!app.Rig.PedalCalibrating)
                 {
                     app.Rig.BeginPedalCalibration();
-                    rigPedalMessage = "Đạp HẾT từng bàn đạp (ga, phanh, côn) 2-3 lần, rồi NHẢ HẾT cả ba và bấm Xong.";
+                    rigPedalMessage = app.Rig.calibration.useClutchPedal ? "Đạp HẾT từng bàn đạp (ga, phanh, côn) 2-3 lần, rồi NHẢ HẾT cả ba và bấm Xong." : "Đạp HẾT ga và phanh 2-3 lần, rồi NHẢ HẾT và bấm Xong (số tự động: không cần côn).";
                 }
                 else app.Rig.FinishPedalCalibration(out rigPedalMessage);
                 RefreshSettingsUI();
@@ -533,10 +533,10 @@ namespace SimRacing
                 RefreshSettingsUI();
             });
             SetRect(gearReset.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(890, -612), new Vector2(1040, -568));
-            manualClutchToggle = CreateToggle(panel.transform, " Côn thực tế: phải đạp côn khi vào số, có thể chết máy", val =>
+            manualClutchToggle = CreateToggle(panel.transform, " Dùng chân côn (số sàn): tắt = SỐ TỰ ĐỘNG, bỏ qua côn", val =>
             {
                 if (app?.Rig?.calibration == null) return;
-                app.Rig.calibration.manualClutch = val; app.Rig.SaveCalibration();
+                app.Rig.calibration.useClutchPedal = val; app.Rig.SaveCalibration();
             });
             SetRect(manualClutchToggle.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(0, 1), new Vector2(1060, -608), new Vector2(1700, -572));
             gearMessageText = CreateText(panel.transform, "", 14, TextInk, FontStyle.Normal, TextAnchor.UpperLeft);
@@ -584,7 +584,7 @@ namespace SimRacing
             SetRect(toMenuBtn.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(1, 1),
                 new Vector2(40, -275), new Vector2(-40, -220));
 
-            var hint = CreateText(card.transform, "Buồng lái: sau khi tiếp tục, đạp hết côn, nhả ga, giữ phanh rồi nhấn nút ĐỀ (hoặc F9).\nF10 đổi nhanh giữa bàn phím và buồng lái.", 15, TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
+            var hint = CreateText(card.transform, "Buồng lái: sau khi tiếp tục, nhả ga, giữ phanh rồi nhấn nút ĐỀ (hoặc F9).\nF10 đổi nhanh giữa bàn phím và buồng lái.", 15, TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
             SetRect(hint.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(20, 20), new Vector2(-20, 85));
         }
 
@@ -781,7 +781,7 @@ namespace SimRacing
                     if (invertThrottleToggle) invertThrottleToggle.SetIsOnWithoutNotify(c.invertThrottle);
                     if (invertBrakeToggle) invertBrakeToggle.SetIsOnWithoutNotify(c.invertBrake);
                     if (invertClutchToggle) invertClutchToggle.SetIsOnWithoutNotify(c.invertClutch);
-                    if (manualClutchToggle) manualClutchToggle.SetIsOnWithoutNotify(c.manualClutch);
+                    if (manualClutchToggle) manualClutchToggle.SetIsOnWithoutNotify(c.useClutchPedal);
                 }
                 RefreshRigLive();
             }

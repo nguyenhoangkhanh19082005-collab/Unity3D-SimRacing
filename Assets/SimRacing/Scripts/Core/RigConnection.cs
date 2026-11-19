@@ -86,7 +86,7 @@ namespace SimRacing
             wasConnected = connected;
             if (!connected && Clock - addressCheck > 3) RefreshAddresses();
             if (Input.GetKeyDown(KeyCode.F9)) Resume();
-            if (InUse && connected && Input.GetKeyDown(KeyCode.N)) SelectNeutral();
+            if (InUse && connected && Input.GetKeyDown(KeyCode.N)) ToggleNeutral();
             // Taking the car from the cockpit itself: brake held, neutral, throttle released, then press START.
             bool starter = connected && Raw.starter;
             if (starter && !previousStarter && InUse) TakeOver(true);
@@ -117,6 +117,14 @@ namespace SimRacing
         bool neutralClutchReleased;
         /// <summary>True while key N overrides the gear the firmware still reports.</summary>
         public bool NeutralSelected => neutralSwitch != 0;
+        /// <summary>Key N: neutral on, or back into the gear the lever holds (the only way out of N in automatic,
+        /// where the clutch is not used, apart from moving the lever).</summary>
+        public void ToggleNeutral()
+        {
+            if (!NeutralSelected) { SelectNeutral(); return; }
+            neutralSwitch = 0;
+            var r = Raw; if (!r.gearFault) r.gear = calibration.Gear(r.switchGear); Raw = r;
+        }
         public void SelectNeutral()
         {
             if (Raw.switchGear == 0 || Raw.gearFault) return;
@@ -152,7 +160,7 @@ namespace SimRacing
                 if (!Focused) return "bấm chuột vào cửa sổ game";
                 var r = Raw; var need = new List<string>();
                 if (r.gearFault) need.Add("cần số chạm 2 công tắc cùng lúc");
-                else if (r.gear != 0 && r.clutch < RigSample.ClutchIn) need.Add($"đạp hết côn (đang ở số {RigProtocol.GearName(r.gear)}; hoặc phím N về số N)");
+                else if (!r.automatic && r.gear != 0 && r.clutch < RigSample.ClutchIn) need.Add($"đạp hết côn (đang ở số {RigProtocol.GearName(r.gear)}; hoặc phím N về số N)");
                 if (r.throttle > .03f) need.Add($"nhả ga (đang {r.throttle * 100:0}%)");
                 if (r.brake < .5f) need.Add($"đạp phanh quá nửa (đang {r.brake * 100:0}%)");
                 if (VehicleSpeed() > 1) need.Add("dừng hẳn xe");
@@ -209,7 +217,7 @@ namespace SimRacing
             for (int i = 0; i < 3; i++) { pedalMin[i] = Mathf.Min(pedalMin[i], now[i]); pedalMax[i] = Mathf.Max(pedalMax[i], now[i]); }
         }
         public string PedalTravel => PedalCalibrating
-            ? $"Hành trình đã ghi:  GA {Mathf.Max(0, pedalMax[0] - pedalMin[0])}   PHANH {Mathf.Max(0, pedalMax[1] - pedalMin[1])}   CÔN {Mathf.Max(0, pedalMax[2] - pedalMin[2])}   (cần ≥ {RigCalibration.MinimumPedalTravel})"
+            ? $"Hành trình đã ghi:  GA {Mathf.Max(0, pedalMax[0] - pedalMin[0])}   PHANH {Mathf.Max(0, pedalMax[1] - pedalMin[1])}{(calibration.useClutchPedal ? $"   CÔN {Mathf.Max(0, pedalMax[2] - pedalMin[2])}" : "")}   (cần ≥ {RigCalibration.MinimumPedalTravel})"
             : "";
         /// <summary>All pedals released now: the current value is "released", the far end seen during
         /// calibration is "pressed". Works whichever way round each potentiometer is wired.</summary>
@@ -219,7 +227,9 @@ namespace SimRacing
             int[] now = { Raw.throttleADC, Raw.brakeADC, Raw.clutchADC };
             int[] released = new int[3], pressed = new int[3];
             var shallow = new List<string>();
-            for (int i = 0; i < 3; i++) {
+            // Automatic mode: the clutch pedal is not used (glued on the current rig), so it is neither required nor changed.
+            int count = calibration.useClutchPedal ? 3 : 2;
+            for (int i = 0; i < count; i++) {
                 int far = Mathf.Abs(pedalMax[i] - now[i]) >= Mathf.Abs(pedalMin[i] - now[i]) ? pedalMax[i] : pedalMin[i];
                 if (Mathf.Abs(far - now[i]) < RigCalibration.MinimumPedalTravel) shallow.Add(PedalNames[i]);
                 // 4% margin at each end: a resting pedal reads 0% and a firm press reliably reaches 100%.
@@ -232,10 +242,10 @@ namespace SimRacing
             }
             calibration.throttleReleased = released[0]; calibration.throttlePressed = pressed[0];
             calibration.brakeReleased = released[1]; calibration.brakePressed = pressed[1];
-            calibration.clutchReleased = released[2]; calibration.clutchPressed = pressed[2];
-            calibration.invertThrottle = calibration.invertBrake = calibration.invertClutch = false;
+            if (count == 3) { calibration.clutchReleased = released[2]; calibration.clutchPressed = pressed[2]; calibration.invertClutch = false; }
+            calibration.invertThrottle = calibration.invertBrake = false;
             PedalCalibrating = false; SaveCalibration();
-            message = $"Đã lưu bàn đạp:  GA {released[0]}→{pressed[0]}   PHANH {released[1]}→{pressed[1]}   CÔN {released[2]}→{pressed[2]}";
+            message = $"Đã lưu bàn đạp:  GA {released[0]}→{pressed[0]}   PHANH {released[1]}→{pressed[1]}" + (count == 3 ? $"   CÔN {released[2]}→{pressed[2]}" : "   (côn không dùng: số tự động)");
             return true;
         }
 

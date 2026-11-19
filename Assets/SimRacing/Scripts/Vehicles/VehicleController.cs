@@ -195,8 +195,9 @@ namespace SimRacing
                 keyboardSample = input;
             }
             else if (holding) input = RigSample.Held;
-            bool manualClutch = !isKeyboardMode && rig.calibration.manualClutch;
-            Gear = isKeyboardMode ? input.gear : ShiftCockpit(input, forwardSpeed, manualClutch);
+            bool manualClutch = !isKeyboardMode && rig.calibration.useClutchPedal;
+            Automatic = !isKeyboardMode && !manualClutch;
+            Gear = isKeyboardMode ? input.gear : Automatic ? AutomaticCockpit(input.gear, forwardSpeed) : ShiftCockpit(input, forwardSpeed, manualClutch);
             if (!isKeyboardMode)
             {
                 if (!input.ignition || Fuel <= 0 || Wrecked || holding)
@@ -229,7 +230,7 @@ namespace SimRacing
             if(stallClock>.7f) { EngineRunning=false; stallClock=0; ShowHint("CHẾT MÁY • Đạp hết côn (hoặc phím N) rồi nhấn ĐỀ để nổ máy lại", 4); }
             // Idle creep: in 1st or reverse with the clutch up and no brake, an idling engine moves the car slowly.
             float drive=input.throttle;
-            if(manualClutch && EngineRunning && (Gear==1 || Gear==6) && Speed<6 && input.brake<.1f) drive=Mathf.Max(drive,.1f);
+            if(!isKeyboardMode && EngineRunning && (Gear==1 || Gear==6) && Speed<6 && input.brake<.1f) drive=Mathf.Max(drive,.1f);
             float shaft=Mathf.Abs(forwardSpeed)/(2*Mathf.PI*definition.tireRadius)*60*Mathf.Abs(ratio)*definition.finalDrive;
             float throttleRPM=Mathf.Lerp(definition.idleRPM,definition.redlineRPM,input.throttle);
             float targetRPM=Gear==0 || engagement<.15f ? throttleRPM : Mathf.Max(Mathf.Lerp(definition.idleRPM,throttleRPM,0.35f),shaft);
@@ -281,6 +282,28 @@ namespace SimRacing
         }
         /// <summary>H-shifter lever position (input.gear) to the gear actually engaged. With the manual clutch
         /// option a running engine only takes a gear while the clutch is pressed; otherwise the box stays in N.</summary>
+        /// <summary>True when the cockpit drives an automatic gearbox: lever 1..5 = D, R = reverse, N = neutral.</summary>
+        public bool Automatic { get; private set; }
+        /// <summary>Automatic gearbox for the cockpit (clutch pedal unused): any forward lever position is D and
+        /// the gear follows the road speed like the keyboard mode; R only engages once the car has stopped.</summary>
+        int AutomaticCockpit(int lever, float forwardSpeed)
+        {
+            if (lever == 0) { engagedGear = 0; return 0; }
+            if (lever == 6)
+            {
+                if (forwardSpeed > 1f && engagedGear != 6) { engagedGear = 0; ShowHint("Dừng hẳn xe rồi mới vào số lùi (R)"); return 0; }
+                engagedGear = 6; return 6;
+            }
+            if (engagedGear == 6 && forwardSpeed < -1f) { ShowHint("Dừng hẳn xe rồi mới vào số tiến (D)"); return 6; }
+            float kmh = Mathf.Abs(forwardSpeed) * 3.6f;
+            int up = engagedGear >= 1 && engagedGear <= 5 ? engagedGear : 1;
+            // Hysteresis: shift up at the threshold, down 8 km/h below it, so the box does not hunt.
+            float[] shiftAt = { 45, 85, 135, 190 };
+            int g = 1;
+            for (int i = 0; i < shiftAt.Length; i++) if (kmh >= shiftAt[i] - (up > i + 1 ? 8 : 0)) g = i + 2;
+            if (definition.ratios != null && g >= definition.ratios.Length) g = Mathf.Max(1, definition.ratios.Length - 1);
+            engagedGear = g; return g;
+        }
         int ShiftCockpit(RigSample input, float forwardSpeed, bool manualClutch)
         {
             int lever = input.gear;

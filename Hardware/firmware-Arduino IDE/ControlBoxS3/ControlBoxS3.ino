@@ -7,6 +7,7 @@
 #include <esp_system.h>
 #include "Config.h"
 #include "RigProtocol.h"
+#include "AdcFilter.h"
 #if !defined(CONFIG_IDF_TARGET_ESP32S3)
 #error Select ESP32S3 Dev Module
 #endif
@@ -102,27 +103,35 @@ bool findMCP() {
   probeI2C(I2C_SDA,I2C_SCL);
   return false;
 }
-// Average of 16 ADC samples: the pedal spans in Config.h are only 50-500 counts wide,
-// so single-sample ESP32 ADC noise would otherwise make the pedal % jump.
-// The first conversion after switching ADC channel is discarded.
-int readAvg(int pin) {
-  (void)analogRead(pin);
-  uint32_t sum = 0;
-  for (int i = 0; i < 16; i++) sum += analogRead(pin);
-  return int((sum + 8) / 16);
+// ---- ADC anti-jitter: oversample + trimmed mean + EMA + hysteresis ----
+// Values inside the filter are in 1/16 ADC count so small drifts are not lost to truncation.
+constexpr int ADC_SAMPLES=16;        // per scan (5 ms), trimmed mean drops min & max
+constexpr int ADC_EMA_SHIFT=3;       // smoothing: 1/8 per scan (~40 ms time constant)
+constexpr int PEDAL_DEADBAND=2;      // raw counts the filtered value must move before output changes
+constexpr int JOY_DEADBAND=6;
+AdcFilter fThrottle,fBrake,fClutch,fJoyX,fJoyY;
+int32_t readTrimmed16(int pin) {     // returns mean in 1/16 count
+  int32_t sum=0, lo=4095, hi=0;
+  for(int i=0;i<ADC_SAMPLES;i++) { int v=analogRead(pin); sum+=v; if(v<lo) lo=v; if(v>hi) hi=v; }
+  return (sum-lo-hi)*16/(ADC_SAMPLES-2);
 }
-uint16_t pedal(int raw,int released,int pressed,uint16_t old) {
-  const int span=abs(pressed-released);
-  if(span==0) return old;
-  // Distance travelled from RELEASED towards PRESSED, whatever the ADC polarity.
-  const int travelled=(raw-released)*((pressed>released)?1:-1);
-  // Endpoint deadband: ~10% of the travel, 3..8 ADC counts, so a resting pedal reads exactly 0 / 4095.
-  const int deadband=constrain(span/10,3,8);
-  int normalized;
-  if(travelled<=deadband) normalized=0;
-  else if(travelled>=span-deadband) normalized=4095;
-  else normalized=(travelled-deadband)*4095/(span-2*deadband);
-  return uint16_t((uint32_t(old)*7+uint32_t(normalized)+4)/8); // Low-pass: 12.5% new sample.
+int32_t filterAdc(AdcFilter& f,int pin,int deadband) {
+  int32_t s=readTrimmed16(pin);
+  if(f.ema<0) { f.ema=f.held=s; }
+  else {
+    int32_t d=s-f.ema;
+    f.ema+= (d>=0) ? (d>>ADC_EMA_SHIFT) : -((-d)>>ADC_EMA_SHIFT);
+    int32_t h=f.ema-f.held; if(h<0) h=-h;
+    if(h>=deadband*16) f.held=f.ema;  // hysteresis: ignore noise smaller than deadband
+  }
+  return f.held;
+}
+uint16_t pedalNorm(int32_t held16,int released,int pressed) {
+  int64_t num=int64_t(held16-released*16)*4095;
+  int32_t n=int32_t(num/(int64_t(pressed-released)*16));
+  n=constrain(n,0,4095);
+  if(n<=16) n=0; else if(n>=4079) n=4095;   // snap to ends so a resting pedal reads exactly 0 / 4095
+  return uint16_t(n);
 }
 bool gameAlive(uint32_t now) { return ethernetOK && haveFeedback && uint32_t(now-lastFeedback)<FEEDBACK_TIMEOUT; }
 bool screenAlive(uint32_t now) { return haveHeartbeat && uint32_t(now-lastHeartbeat)<SCREEN_TIMEOUT; }
@@ -199,11 +208,14 @@ void scanInputs(uint32_t now) {
     }
   }
   input.timestamp=now; input.encoder=readEncoder();
-  rawThrottle=readAvg(PEDAL_THROTTLE); rawBrake=readAvg(PEDAL_BRAKE); rawClutch=readAvg(PEDAL_CLUTCH);
-  input.throttle=pedal(rawThrottle,THROTTLE_RELEASED,THROTTLE_PRESSED,input.throttle);
-  input.brake=pedal(rawBrake,BRAKE_RELEASED,BRAKE_PRESSED,input.brake);
-  input.clutch=pedal(rawClutch,CLUTCH_RELEASED,CLUTCH_PRESSED,input.clutch);
-  input.joyX=analogRead(JOY_X); input.joyY=analogRead(JOY_Y);
+  int32_t t16=filterAdc(fThrottle,PEDAL_THROTTLE,PEDAL_DEADBAND);
+  int32_t b16=filterAdc(fBrake,PEDAL_BRAKE,PEDAL_DEADBAND);
+  int32_t c16=filterAdc(fClutch,PEDAL_CLUTCH,PEDAL_DEADBAND);
+  rawThrottle=t16>>4; rawBrake=b16>>4; rawClutch=c16>>4;
+  input.throttle=pedalNorm(t16,THROTTLE_RELEASED,THROTTLE_PRESSED);
+  input.brake=pedalNorm(b16,BRAKE_RELEASED,BRAKE_PRESSED);
+  input.clutch=pedalNorm(c16,CLUTCH_RELEASED,CLUTCH_PRESSED);
+  input.joyX=filterAdc(fJoyX,JOY_X,JOY_DEADBAND)>>4; input.joyY=filterAdc(fJoyY,JOY_Y,JOY_DEADBAND)>>4;
   bool joyChanged=joy.update(digitalRead(JOY_BUTTON)==LOW,now);
   input.joyButton=joy.stable;
 
@@ -283,7 +295,7 @@ void setup() {
   uint32_t previousStage=lastStage; lastStage=ST_BOOT;
   Serial0.setTxBufferSize(512);
   Serial0.begin(115200,SERIAL_8N1,44,43);
-  Serial0.printf("\n[RIG fix4] reset=%d previousStage=%lu FFB=%d\n",int(esp_reset_reason()),(unsigned long)previousStage,int(ENABLE_FFB));
+  Serial0.printf("\n[RIG fix5] reset=%d previousStage=%lu FFB=%d\n",int(esp_reset_reason()),(unsigned long)previousStage,int(ENABLE_FFB));
   dash.setRxBufferSize(512); dash.begin(115200,SERIAL_8N1,DASH_RX,DASH_TX);
   analogReadResolution(12); analogSetAttenuation(ADC_11db);
   pinMode(JOY_BUTTON,INPUT_PULLUP);

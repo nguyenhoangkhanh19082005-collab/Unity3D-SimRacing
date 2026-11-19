@@ -50,6 +50,20 @@ namespace SimRacing
             app.Rig.SendMessage("OnApplicationFocus",true);Check(app.Rig.Resume(),"neutral + brake explicitly resumes");
             yield return new WaitForSecondsRealtime(3.5f);Check(app.Session.Active,"countdown starts session");
             flags=3;yield return new WaitForSecondsRealtime(.5f);flags=1;Check(app.Car.EngineRunning,"ignition and starter start engine");
+            // Automatic gearbox (default; the rig's clutch pedal is glued): START, lever to 1 = D, throttle, go.
+            // The clutch reads fully pressed here and must not stop the car from driving.
+            app.Rig.calibration.useClutchPedal=false;clutch=4095;gear=1;yield return new WaitForSecondsRealtime(.3f);
+            Check(app.Car.Automatic && app.Car.Gear==1 && app.Rig.Raw.clutch==0,"automatic: lever 1 engages D with the clutch ignored");
+            Vector3 autoOrigin=app.Car.transform.position;brake=0;throttle=4095;yield return new WaitForSecondsRealtime(6);
+            Check(app.Car.Speed>20 && Vector3.Distance(autoOrigin,app.Car.transform.position)>10,"automatic: car drives off without the clutch");
+            Check(app.Car.Gear>=2,"automatic: gearbox shifts up by itself (D"+app.Car.Gear+", "+app.Car.Speed.ToString("0")+" km/h)");
+            throttle=0;brake=4095;yield return new WaitForSecondsRealtime(5);
+            Check(app.Car.Speed<1 && app.Car.EngineRunning,"automatic: braking to a stop in D does not stall");
+            gear=6;yield return new WaitForSecondsRealtime(.3f);brake=0;throttle=1500;yield return new WaitForSecondsRealtime(1.5f);
+            Check(app.Car.Gear==6 && Vector3.Dot(app.Car.Body.linearVelocity,app.Car.transform.forward)<-.5f,"automatic: R reverses");
+            throttle=0;brake=4095;gear=0;yield return new WaitForSecondsRealtime(3);
+            // The rest of this drive checks the optional manual gearbox ("Dùng chân côn")
+            app.Rig.calibration.useClutchPedal=true;yield return new WaitForSecondsRealtime(.1f);
             // Manual gearbox: moving the lever into 1st with the clutch up is refused (the box stays in N)
             clutch=0;gear=1;yield return new WaitForSecondsRealtime(.3f);
             Check(app.Car.Gear==0 && app.Car.Hint!="" && app.Car.EngineRunning,"shifting without the clutch is refused");

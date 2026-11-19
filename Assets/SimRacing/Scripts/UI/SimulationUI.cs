@@ -106,7 +106,7 @@ namespace SimRacing
                 Panel(1000, 526, 258, 148);
                 Label(1020, 536, 175, 65, car.Speed.ToString("0"), big);
                 Label(1155, 553, 90, 35, "km/h", small);
-                Label(1020, 604, 220, 40, $"{(car.Gear == 0 ? "N" : car.Gear == 6 ? "R" : car.Gear.ToString())}    {car.RPM:0} rpm", heading);
+                Label(1020, 604, 220, 40, $"{(car.Gear == 0 ? "N" : car.Gear == 6 ? "R" : car.Automatic ? "D" + car.Gear : car.Gear.ToString())}    {car.RPM:0} rpm", heading);
             }
 
             Panel(22, 584, 320, 91);
@@ -114,11 +114,11 @@ namespace SimRacing
             Label(38, 627, 288, 38, car.Refueling ? "ĐANG TIẾP NHIÊN LIỆU" : car.EngineRunning ? "ĐỘNG CƠ ĐANG CHẠY" : keyboard ? "CHẾ ĐỘ BÀN PHÍM" : "BẬT KHÓA VÀ ĐỀ MÁY TỪ BUỒNG LÁI", small);
             Label(250, 678, 1020, 30, keyboard
                 ? "W/S: Ga · Phanh/Lùi    A/D: Lái    Space: Phanh    H: Đèn    V: Góc nhìn    F10: Sang buồng lái    Esc: Tạm dừng"
-                : "Nhận xe: phanh + côn + nút ĐỀ (hoặc F9)    N: Về số N    V/nút joystick: Góc nhìn    Backspace: Cứu hộ    F10: Sang bàn phím    Esc: Tạm dừng", small);
+                : (car.Automatic ? "Nhận xe: phanh + nút ĐỀ (hoặc F9), gạt số 1-5 = D    N: Số N" : "Nhận xe: phanh + côn + nút ĐỀ (hoặc F9)    N: Số N") + "    V/nút joystick: Góc nhìn    Backspace: Cứu hộ    F10: Sang bàn phím    Esc: Tạm dừng", small);
             if (!keyboard && app.Rig.Connected)
             {
                 var r = app.Rig.Raw;
-                Label(360, 652, 900, 24, $"CẦN SỐ {RigProtocol.GearName(r.gear)}{(r.gearFault ? " (lỗi 2 công tắc)" : app.Rig.NeutralSelected ? " (phím N)" : "")}   ·   GA {r.throttle * 100:0}%   PHANH {r.brake * 100:0}%   CÔN {r.clutch * 100:0}%   ·   LÁI {r.steer * 100:+0;-0;0}%   ·   KHÓA ĐIỆN {(r.ignition ? "BẬT" : "TẮT")}", small);
+                Label(360, 652, 900, 24, $"CẦN SỐ {RigProtocol.GearName(r.gear)}{(r.gearFault ? " (lỗi 2 công tắc)" : app.Rig.NeutralSelected ? " (phím N)" : "")}   ·   GA {r.throttle * 100:0}%   PHANH {r.brake * 100:0}%{(r.automatic ? "   SỐ TỰ ĐỘNG" : $"   CÔN {r.clutch * 100:0}%")}   ·   LÁI {r.steer * 100:+0;-0;0}%   ·   KHÓA ĐIỆN {(r.ignition ? "BẬT" : "TẮT")}", small);
             }
 
             string notice = session.Notice != "" ? session.Notice : car.Hint;

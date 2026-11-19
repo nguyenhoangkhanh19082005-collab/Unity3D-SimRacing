@@ -16,9 +16,12 @@ Game tự chạy khoảng 5 phút rồi tự thoát. Mở `SimRacing-Windows/Ver
 | `keyboard mode ignores rig pedals` | Ở chế độ bàn phím, đạp ga trên buồng lái không làm xe chạy |
 | `switching to rig mode waits for F9 takeover` | Đổi sang buồng lái thì xe bị khóa cho tới khi nhận xe (F9 hoặc nút ĐỀ) |
 | `settings screen reads the live cockpit` | Màn hình THIẾT LẬP đọc trực tiếp dữ liệu buồng lái (ảnh `01c-settings-cockpit.png`) |
-| `shifting without the clutch is refused` / `clutch pressed engages 1st gear` | Côn thực tế: không đạp côn thì không vào số |
+| `automatic: lever 1 engages D with the clutch ignored` | Số tự động (mặc định): côn báo đạp hết (như bị keo) mà vẫn vào D |
+| `automatic: car drives off without the clutch` / `gearbox shifts up by itself` | Nổ máy, gạt số 1, đạp ga là chạy, hộp số tự lên số |
+| `automatic: braking to a stop in D does not stall` / `R reverses` | Phanh dừng ở D không chết máy, R lùi được |
+| `shifting without the clutch is refused` / `clutch pressed engages 1st gear` | Khi bật *Dùng chân côn*: không đạp côn thì không vào số |
 | `releasing the clutch against the brake stalls` / `engine restarts after a stall` | Chết máy khi phanh dừng mà còn số, đề lại được |
-| `START button on the cockpit takes over` | Phanh + côn + nút ĐỀ trên buồng lái là nhận xe khi cần số đang giữ số 1 (firmware fix4), không cần bàn phím |
+| `START button on the cockpit takes over` | Khi bật *Dùng chân côn*: phanh + côn + nút ĐỀ là nhận xe dù cần số đang giữ số 1, không cần bàn phím |
 | `latched 1st gear engages with the clutch after takeover` | Nhận xe xong, số 1 đang giữ vào ngay vì côn đang đạp |
 | `key N selects neutral on a latched shifter` / `pressing the clutch again leaves neutral` | Phím N về N dù firmware vẫn báo số 1; nhả rồi đạp côn lại thì số 1 vào lại |
 
@@ -39,10 +42,11 @@ Các bài kiểm tra giao thức chạy khi build (`ProtocolVerification`) còn 
    - W chạy, S phanh rồi lùi, A/D đánh lái. H bật đèn (tắt → cốt → pha). Xe không có gạt mưa.
 2. Đang lái, nhấn **F10**.
    - Hiện thông báo *Đã chuyển sang BUỒNG LÁI*. Xe bị khóa phanh, HUD báo *CHƯA KẾT NỐI BUỒNG LÁI* (nếu ESP32 chưa gửi) hoặc *BUỒNG LÁI TẠM KHÓA* (nếu đã kết nối). Phím W không còn tác dụng.
-3. Với buồng lái thật đã kết nối (xem [HUONG_DAN_BUONG_LAI.md](HUONG_DAN_BUONG_LAI.md)) và firmware fix4: bật khóa điện, nhả ga, giữ phanh và côn, nhấn **nút ĐỀ** (hoặc F9), gạt số 1 rồi buông cần, nhả côn từ từ và chạy.
-   - Buông cần số sau khi gạt: HUD vẫn ghi số 1. Phím **N** đưa về N; đạp côn lại thì số 1 vào lại.
-   - Vô lăng, bàn đạp, cần số điều khiển xe. Dòng dưới HUD hiện số, % ga/phanh/côn và % lái trực tiếp.
-   - Gạt số khi chưa đạp côn: HUD báo *KHÔNG VÀO ĐƯỢC SỐ*. Phanh dừng xe khi còn số mà không đạp côn: *CHẾT MÁY*.
+3. Với buồng lái thật đã kết nối (xem [HUONG_DAN_BUONG_LAI.md](HUONG_DAN_BUONG_LAI.md)) và firmware fix5 (số tự động, mặc định): bật khóa điện, nhả ga, giữ phanh, nhấn **nút ĐỀ** (hoặc F9), gạt số 1 rồi buông cần, nhả phanh, đạp ga và chạy. Côn không có tác dụng.
+   - Buông cần số sau khi gạt: HUD vẫn ghi `D1`, tự lên `D2`, `D3`… khi tăng tốc. Phím **N** bật/tắt số N.
+   - Vô lăng, bàn đạp, cần số điều khiển xe. Dòng dưới HUD hiện số, % ga/phanh, chữ SỐ TỰ ĐỘNG và % lái trực tiếp.
+   - Phanh dừng xe ở D: không chết máy. Gạt R khi xe còn chạy tới: HUD báo phải dừng hẳn.
+   - Chỉ khi bật *Dùng chân côn* (THIẾT LẬP): gạt số khi chưa đạp côn thì *KHÔNG VÀO ĐƯỢC SỐ*, phanh dừng khi còn số mà không đạp côn thì *CHẾT MÁY*.
 4. Nhấn **Esc** → nút *Điều khiển: … ⇄ Đổi (F10)* → đổi lại **Bàn phím** → Tiếp tục.
    - Xe lái được ngay bằng bàn phím, vô lăng thật hết lực phản hồi.
 5. Thoát game rồi mở lại: lựa chọn điều khiển lần cuối vẫn được giữ.

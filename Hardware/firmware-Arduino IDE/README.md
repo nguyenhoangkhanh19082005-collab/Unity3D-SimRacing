@@ -1,5 +1,7 @@
 # Bộ firmware SimRacing: S3 Control Box + WROOM32 Touchscreen
 
+**Cập nhật fix5:** bộ lọc ADC của nhóm (`AdcFilter.h`: 16 mẫu bỏ min/max, EMA 1/8, trễ 2 count cho bàn đạp và 6 cho joystick, chặn hai đầu về đúng 0/4095), giữ nguyên phần mạng broadcast, tự dò lại MCP23017 và giữ số của fix4. Không dùng bản `ControlBoxS3_fixed` cũ: một lần lỗi I2C là MCP23017 bị bỏ vĩnh viễn và cần số luôn N. Game mặc định lái **số tự động** và bỏ qua chân côn.
+
 **Cập nhật fix4:** cần số tự giữ số đã gạt (công tắc hành trình chỉ bị nhấn lúc đè cần vào rãnh); không chạm hoặc chạm 2 công tắc thì giữ số cũ; số không bị xóa khi MCP23017 lỗi/khởi động lại (bỏ qua tới 4 lần đọc I2C lỗi liên tiếp). Bàn đạp: bỏ mẫu ADC đầu, vùng chết hai đầu hành trình, lọc 12,5%. Game nhận xe khi đạp hết côn (không cần N) và phím N đưa về số N.
 
 **Cập nhật fix3:** `GEAR_PIN` trong Config.h (số 1,2,3,4,5,R = GPA0,3,1,4,2,5 theo đo thực tế) và dải biến trở đo được của ga/phanh/côn; đọc ADC trung bình 16 mẫu. Sau khi nạp fix3: trong game để bảng cần số ở *Mặc định* và hiệu chỉnh lại bàn đạp nếu đã hiệu chỉnh bằng firmware cũ.

@@ -11,8 +11,8 @@ Chọn ở hàng **ĐIỀU KHIỂN** trên màn hình chính. Lựa chọn đư�
 | | Bàn phím | Buồng lái thật (ESP32) |
 | --- | --- | --- |
 | Lái | A / D (hoặc ← →) | Vô lăng encoder |
-| Ga / phanh | W / S (S giữ khi đứng yên = lùi), Space = phanh dần | Bàn đạp ga, phanh, côn |
-| Số | Tự động 1–5, lùi tự động | Cần số 1–5, R, N (số tay, có côn) |
+| Ga / phanh | W / S (S giữ khi đứng yên = lùi), Space = phanh dần | Bàn đạp ga, phanh (côn không dùng, trừ khi bật *Dùng chân côn*) |
+| Số | Tự động 1–5, lùi tự động | Cần số 1–5 = D (tự động lên xuống số), R = lùi, phím N = số N |
 | Đèn | H (tắt → cốt → pha) | Công tắc trên buồng lái |
 | Đề máy | Tự nổ máy | Khóa điện + nút đề |
 | Phản hồi lực | Không | Có (gửi về ESP32) |
@@ -25,8 +25,8 @@ Chọn ở hàng **ĐIỀU KHIỂN** trên màn hình chính. Lựa chọn đư�
 
 1. Lần đầu trên mỗi máy: chạy `Thiet_Lap_Mang_Buong_Lai.bat` (quyền Admin) để mở tường lửa UDP 9999 và đặt IP 192.168.1.100 cho cổng LAN, rồi vào **THIẾT LẬP** hiệu chỉnh vô lăng, bàn đạp và học cần số.
 2. Chọn **Buồng lái thật (ESP32)**, chọn xe, cung đường, thời tiết rồi bắt đầu. HUD báo *CHƯA KẾT NỐI BUỒNG LÁI* nếu chưa nhận được dữ liệu, kèm nguyên nhân.
-3. Bật khóa điện, giữ phanh, đạp hết côn (hoặc cần số ở N), nhả ga, rồi nhấn **nút ĐỀ** trên buồng lái (hoặc **F9**) để nhận xe và nổ máy. Nếu chưa được, HUD ghi rõ còn thiếu gì.
-4. Giữ côn, gạt số 1 (firmware fix4 tự giữ số khi buông cần), thêm ga và nhả côn từ từ. Phím **N** đưa hộp số về N khi đứng chờ. Khi bật *Côn thực tế*, sang số phải đạp côn và xe có thể chết máy như xe số sàn thật.
+3. Bật khóa điện, giữ phanh, nhả ga, rồi nhấn **nút ĐỀ** trên buồng lái (hoặc **F9**) để nhận xe và nổ máy. Nếu chưa được, HUD ghi rõ còn thiếu gì.
+4. Gạt số 1 (firmware fix5 tự giữ số khi buông cần), nhả phanh, đạp ga: xe chạy như **số tự động**, không cần côn. Phím **N** bật/tắt số N khi đứng chờ. Muốn lái số sàn có côn: THIẾT LẬP → bật *Dùng chân côn*. Khi bật *Côn thực tế*, sang số phải đạp côn và xe có thể chết máy như xe số sàn thật.
 
 Mất gói tin quá 250 ms, mất tiêu điểm cửa sổ, tạm dừng hoặc đổi chế độ điều khiển đều khóa điều khiển và ngắt phản hồi lực. Khi kết nối lại, làm lại bước 3. Game không tự tiếp tục ga cũ. Cần số chạm hai công tắc cùng lúc được coi là N.
 
@@ -47,7 +47,7 @@ Mặc định **Ngẫu nhiên**: mỗi lượt chơi bốc thăm Nắng (45%), M
 | --- | --- |
 | F1 / F2 / V | Buồng lái / bám đuôi / đổi góc nhìn |
 | F9 | Mở khóa buồng lái khi thỏa điều kiện tiếp quản |
-| N | Buồng lái: về số N (cần số tự giữ số không có vị trí N) |
+| N | Buồng lái: bật/tắt số N (cần số tự giữ số không có vị trí N) |
 | F10 | Đổi giữa bàn phím và buồng lái thật |
 | Esc | Tạm dừng / tiếp tục |
 | Backspace | Cứu hộ khi đã dừng xe |
