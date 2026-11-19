@@ -114,7 +114,7 @@ namespace SimRacing
             Label(38, 627, 288, 38, car.Refueling ? "ĐANG TIẾP NHIÊN LIỆU" : car.EngineRunning ? "ĐỘNG CƠ ĐANG CHẠY" : keyboard ? "CHẾ ĐỘ BÀN PHÍM" : "BẬT KHÓA VÀ ĐỀ MÁY TỪ BUỒNG LÁI", small);
             Label(250, 678, 1020, 30, keyboard
                 ? "W/S: Ga · Phanh/Lùi    A/D: Lái    Space: Phanh    H: Đèn    V: Góc nhìn    F10: Sang buồng lái    Esc: Tạm dừng"
-                : (car.Automatic ? "Nhận xe: phanh + nút ĐỀ (hoặc F9), gạt số 1-5 = D    N: Số N" : "Nhận xe: phanh + côn + nút ĐỀ (hoặc F9)    N: Số N") + "    V/nút joystick: Góc nhìn    Backspace: Cứu hộ    F10: Sang bàn phím    Esc: Tạm dừng", small);
+                : (car.Automatic ? "Nhận xe: đạp phanh, gạt số 1-5 = D    N: Số N" : "Nhận xe: đạp phanh + côn    N: Số N") + "    V/nút joystick: Góc nhìn    Backspace: Cứu hộ    F10: Sang bàn phím    Esc: Tạm dừng", small);
             if (!keyboard && app.Rig.Connected)
             {
                 var r = app.Rig.Raw;

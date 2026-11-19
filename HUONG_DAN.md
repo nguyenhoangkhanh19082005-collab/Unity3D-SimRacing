@@ -17,7 +17,7 @@ Chọn ở hàng **ĐIỀU KHIỂN** trên màn hình chính. Lựa chọn đư�
 | Đề máy | Tự nổ máy | Khóa điện + nút đề |
 | Phản hồi lực | Không | Có (gửi về ESP32) |
 
-Ở chế độ bàn phím, game bỏ qua hoàn toàn tín hiệu từ buồng lái và không gửi lực phản hồi. Ở chế độ buồng lái, bàn phím chỉ dùng cho camera, tạm dừng, cứu hộ và F9/F10.
+Ở chế độ bàn phím, game bỏ qua hoàn toàn tín hiệu từ buồng lái và không gửi lực phản hồi. Ở chế độ buồng lái, bàn phím chỉ dùng cho camera (V), tạm dừng (Esc), cứu hộ (Backspace), nạp xăng (R), số N (N) và đổi chế độ (F10). Không còn phím F9: xe tự nhận khi bạn đạp phanh.
 
 ### Khởi hành với buồng lái thật
 
@@ -25,7 +25,7 @@ Chọn ở hàng **ĐIỀU KHIỂN** trên màn hình chính. Lựa chọn đư�
 
 1. Lần đầu trên mỗi máy: chạy `Thiet_Lap_Mang_Buong_Lai.bat` (quyền Admin) để mở tường lửa UDP 9999 và đặt IP 192.168.1.100 cho cổng LAN, rồi vào **THIẾT LẬP** hiệu chỉnh vô lăng, bàn đạp và học cần số.
 2. Chọn **Buồng lái thật (ESP32)**, chọn xe, cung đường, thời tiết rồi bắt đầu. HUD báo *CHƯA KẾT NỐI BUỒNG LÁI* nếu chưa nhận được dữ liệu, kèm nguyên nhân.
-3. Bật khóa điện, giữ phanh, nhả ga, rồi nhấn **nút ĐỀ** trên buồng lái (hoặc **F9**) để nhận xe. Hết đếm ngược máy tự nổ (khóa điện phải BẬT). Nếu chưa được, giữa HUD ghi rõ còn thiếu gì.
+3. Bật khóa điện, nhả ga, **đạp phanh**: game tự nhận xe, đếm ngược rồi tự nổ máy. Không cần bấm nút ĐỀ hay phím nào. Nếu chưa được, giữa HUD ghi rõ còn thiếu gì.
 4. Gạt số 1 (firmware fix5 tự giữ số khi buông cần), nhả phanh, đạp ga: xe chạy như **số tự động**, không cần côn. Phím **N** bật/tắt số N khi đứng chờ. Muốn lái số sàn có côn: THIẾT LẬP → bật *Dùng chân côn*. Khi bật *Côn thực tế*, sang số phải đạp côn và xe có thể chết máy như xe số sàn thật.
 
 Mất gói tin quá 250 ms, mất tiêu điểm cửa sổ, tạm dừng hoặc đổi chế độ điều khiển đều khóa điều khiển và ngắt phản hồi lực. Khi kết nối lại, làm lại bước 3. Game không tự tiếp tục ga cũ. Cần số chạm hai công tắc cùng lúc được coi là N.
@@ -46,7 +46,6 @@ Mặc định **Ngẫu nhiên**: mỗi lượt chơi bốc thăm Nắng (45%), M
 | Phím | Thao tác |
 | --- | --- |
 | F1 / F2 / V | Buồng lái / bám đuôi / đổi góc nhìn |
-| F9 | Mở khóa buồng lái khi thỏa điều kiện tiếp quản |
 | N | Buồng lái: bật/tắt số N (cần số tự giữ số không có vị trí N) |
 | F10 | Đổi giữa bàn phím và buồng lái thật |
 | Esc | Tạm dừng / tiếp tục |

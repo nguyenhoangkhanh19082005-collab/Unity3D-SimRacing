@@ -45,13 +45,14 @@ namespace SimRacing
             Check(app.Car && app.Track && app.CameraRig,"drive loads");Check(app.Car.Grounded,"wheels settle on road");Check(app.Car.Health>99,"spawn does not damage car");
             yield return Capture("02-cockpit.png");
             app.GetComponent<SimulationUI>().enabled=false;yield return Capture("02b-cockpit-clean.png");app.GetComponent<SimulationUI>().enabled=true;
-            sender=new UdpClient();sender.Connect(IPAddress.Loopback,app.Rig.Port);sending=true;
-            yield return new WaitForSecondsRealtime(.5f);Check(app.Rig.Connected && app.Rig.Held,"new rig remains held");
-            app.Rig.SendMessage("OnApplicationFocus",true);Check(app.Rig.Resume(),"neutral + brake explicitly resumes");
+            brake=0;sender=new UdpClient();sender.Connect(IPAddress.Loopback,app.Rig.Port);sending=true;
+            yield return new WaitForSecondsRealtime(.5f);Check(app.Rig.Connected && app.Rig.Held,"new rig stays held while the brake is released");
+            app.Rig.SendMessage("OnApplicationFocus",true);brake=4095;yield return new WaitForSecondsRealtime(.2f);
+            Check(!app.Rig.Held,"pressing the brake takes the car over (no key)");
             yield return new WaitForSecondsRealtime(3.5f);Check(app.Session.Active,"countdown starts session");
-            // Automatic: F9 takeover also cranks the engine once the ignition is on (no START press needed)
+            // Automatic: the takeover also cranks the engine once the ignition is on (no START press needed)
             Check(!app.Car.EngineRunning && app.Car.Hint!="","engine off with the ignition off is explained on the HUD");
-            flags=1;yield return new WaitForSecondsRealtime(.3f);Check(app.Car.EngineRunning,"automatic: F9 takeover starts the engine");
+            flags=1;yield return new WaitForSecondsRealtime(.3f);Check(app.Car.EngineRunning,"automatic: takeover starts the engine without START");
             flags=3;yield return new WaitForSecondsRealtime(.5f);flags=1;Check(app.Car.EngineRunning,"ignition and starter start engine");
             // Automatic gearbox (default; the rig's clutch pedal is glued): START, lever to 1 = D, throttle, go.
             // The clutch reads fully pressed here and must not stop the car from driving.
@@ -91,8 +92,8 @@ namespace SimRacing
             clutch=4095;gear=0;yield return new WaitForSecondsRealtime(.2f);flags=3;yield return new WaitForSecondsRealtime(.4f);flags=1;
             Check(app.Car.EngineRunning,"engine restarts after a stall");
             sending=false;yield return new WaitForSecondsRealtime(.4f);Check(!app.Rig.Connected && app.Rig.Held,"timeout holds rig");
-            sending=true;yield return new WaitForSecondsRealtime(.3f);Check(app.Rig.Held,"reconnection does not auto resume");
-            app.Rig.SendMessage("OnApplicationFocus",true);Check(app.Rig.Resume(),"explicit resume after timeout");
+            brake=0;sending=true;yield return new WaitForSecondsRealtime(.3f);Check(app.Rig.Held,"reconnection stays held while the brake is released");
+            app.Rig.SendMessage("OnApplicationFocus",true);brake=4095;yield return new WaitForSecondsRealtime(.2f);Check(!app.Rig.Held,"brake takes over again after a timeout");
             app.Pause();yield return new WaitForSecondsRealtime(.1f);Check(app.Rig.Held && Time.timeScale==0,"pause holds rig");app.Resume();
             app.Rig.SendMessage("OnApplicationFocus",true);app.Rig.Resume();flags=1|16|64|4;
             yield return new WaitForSecondsRealtime(.3f);Check(app.Car.Controls.headlights==2 && app.Car.Controls.hazard,"live lights and hazard reach car");
@@ -101,7 +102,7 @@ namespace SimRacing
             app.CameraRig.Mode=1;yield return new WaitForSecondsRealtime(1);yield return Capture("05-exterior.png");
             Check(app.Car.Health>90,"normal road drive does not cause false crash damage");
             Check(app.Car.Recover(false),"stationary recovery");Check(app.Car.Recoveries==1 && app.Rig.Held,"recovery invalidates attempt and holds rig");
-            // Control modes: the keyboard mode must ignore a live rig, and switching back to the rig waits for F9
+            // Control modes: the keyboard mode must ignore a live rig, and switching back to the rig waits for the brake
             yield return new WaitForSecondsRealtime(2.1f);
             // Taking the car back from the cockpit itself. Firmware fix4 latches the last gear switch, so the
             // lever still reports 1st: brake + clutch pressed replaces neutral, then press START
@@ -121,7 +122,7 @@ namespace SimRacing
             // Judged on the controls the car receives, not its speed: free-drive traffic may bump the parked car.
             Check(app.Car.KeyboardDriving && app.Rig.Held && app.Car.Controls.throttle<.01f && app.Rig.Raw.throttle>.9f,"keyboard mode ignores rig pedals");
             app.SetControl(ControlMode.Rig);yield return null;
-            Check(!app.Car.KeyboardDriving && app.Rig.Held,"switching to rig mode waits for F9 takeover");
+            Check(!app.Car.KeyboardDriving && app.Rig.Held,"switching to rig mode waits for the brake");
             throttle=0;brake=clutch=4095;gear=0;flags=0;yield return new WaitForSecondsRealtime(.3f);
             sending=false;sender.Close();sender=null;
             app.SetControl(ControlMode.Keyboard);
@@ -287,7 +288,7 @@ namespace SimRacing
             while((!app.Rig.Connected || !app.Rig.Raw.Ready || app.Car.Speed>1) && Time.unscaledTime<readyDeadline)yield return null;
             app.Rig.SendMessage("OnApplicationFocus",true);
             Debug.Log($"[CAREER READY] held={app.Rig.Held} connected={app.Rig.Connected} ready={app.Rig.Raw.Ready} paused={app.Rig.Paused} speed={app.Car.Speed} brake={app.Rig.Raw.brake} throttle={app.Rig.Raw.throttle} gear={app.Rig.Raw.gear} starter={app.Rig.Raw.starter}");
-            bool takeover=app.Rig.Resume();Check(takeover,"career safe takeover");if(!takeover){sending=false;yield break;}
+            bool takeover=!app.Rig.Held || app.Rig.Resume();Check(takeover,"career safe takeover");if(!takeover){sending=false;yield break;}
             yield return new WaitForSecondsRealtime(3.5f);flags=3;yield return new WaitForSecondsRealtime(.3f);flags=1;clutch=4095;gear=1;yield return new WaitForSecondsRealtime(.3f);clutch=0;
             float timeout=Time.unscaledTime+75;
             while(!app.Session.Finished && Time.unscaledTime<timeout) {

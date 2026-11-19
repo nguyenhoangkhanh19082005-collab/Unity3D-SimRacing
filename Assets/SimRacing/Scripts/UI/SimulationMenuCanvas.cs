@@ -428,7 +428,7 @@ namespace SimRacing
             var info1 = CreateText(panel.transform, "Chế độ điều khiển (Bàn phím / Buồng lái thật) chọn ở màn hình chính, đổi khi đang lái bằng F10.", 16, TextInk, FontStyle.Normal, TextAnchor.MiddleLeft);
             SetRect(info1.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -340), new Vector2(520, -290));
 
-            var info2 = CreateText(panel.transform, "Lái bằng buồng lái: bật KHÓA ĐIỆN → đạp phanh, nhả ga → nhấn nút ĐỀ (hoặc F9) để nhận xe và nổ máy → gạt số 1…5 (= D, tự lên xuống số) hoặc R → nhả phanh, đạp ga. Mặc định là SỐ TỰ ĐỘNG, không dùng côn. Phím N bật/tắt số N. Bật «Dùng chân côn» nếu muốn lái số sàn.", 15, TextMuted, FontStyle.Normal, TextAnchor.UpperLeft);
+            var info2 = CreateText(panel.transform, "Lái bằng buồng lái: bật KHÓA ĐIỆN → nhả ga, đạp phanh: xe tự nhận và tự nổ máy, không cần bấm nút nào → gạt số 1…5 (= D, tự lên xuống số) hoặc R → nhả phanh, đạp ga. Mặc định là SỐ TỰ ĐỘNG, không dùng côn. Phím N bật/tắt số N. Bật «Dùng chân côn» nếu muốn lái số sàn.", 15, TextMuted, FontStyle.Normal, TextAnchor.UpperLeft);
             SetRect(info2.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -520), new Vector2(520, -355));
 
             // Right column: physical cockpit (ESP32) diagnostics and the three calibration wizards
@@ -584,7 +584,7 @@ namespace SimRacing
             SetRect(toMenuBtn.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(1, 1),
                 new Vector2(40, -275), new Vector2(-40, -220));
 
-            var hint = CreateText(card.transform, "Buồng lái: sau khi tiếp tục, nhả ga, giữ phanh rồi nhấn nút ĐỀ (hoặc F9).\nF10 đổi nhanh giữa bàn phím và buồng lái.", 15, TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
+            var hint = CreateText(card.transform, "Buồng lái: sau khi tiếp tục, nhả ga và đạp phanh là nhận lại xe.\nF10 đổi nhanh giữa bàn phím và buồng lái.", 15, TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
             SetRect(hint.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(20, 20), new Vector2(-20, 85));
         }
 

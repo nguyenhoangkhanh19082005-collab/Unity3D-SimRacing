@@ -34,7 +34,7 @@ namespace SimRacing.Editor
             Check(RigProtocol.TryDecode(b,cal,out sample) && sample.switchGear==2 && sample.gear==3,"shifter map");
             Check(!RigCalibration.GearMapValid(new[]{1,1,2,3,4,5,6}) && !RigCalibration.GearMapValid(new[]{0,1,2}),"invalid shifter map rejected");
             b[26]=1;RigProtocol.TryDecode(b,cal,out sample);Check(sample.gear==0 && !sample.SafeToTakeOver,"two shifter switches read as neutral");
-            // START button takeover: the safe state ignores the starter bit, F9's Ready does not
+            // START button takeover: the safe state ignores the starter bit, the Ready does not
             b=RuntimeVerification.Packet(107,0,0,4095,4095,0,3);RigProtocol.TryDecode(b,c,out sample);Check(sample.SafeToTakeOver && !sample.Ready,"start button takeover state");
             // Latched shifter (firmware fix4), manual box: in gear, the clutch pressed replaces neutral for the takeover
             var manual=new RigCalibration{useClutchPedal=true};

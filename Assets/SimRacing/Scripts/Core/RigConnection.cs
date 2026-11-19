@@ -86,8 +86,9 @@ namespace SimRacing
             if (wasConnected && !connected) { SendFeedback(0, 0, 0, 0, 0, false, false, 0); remote = null; Raw = RigSample.Held; }
             wasConnected = connected;
             if (!connected && Clock - addressCheck > 3) RefreshAddresses();
-            // F9: take the car over; while already driving in automatic it cranks the engine (backup for the START button).
-            if (Input.GetKeyDown(KeyCode.F9)) { if (!Held && connected && !calibration.useClutchPedal) StartRequested = true; else Resume(); }
+            // No key is needed to take the car: as soon as the cockpit is in the safe state (brake held, throttle
+            // released) it drives. The control box's START signal does not reach the game on the current rig.
+            if (Held && InUse && connected && Raw.SafeToTakeOver) TakeOver(true);
             if (InUse && connected && Input.GetKeyDown(KeyCode.N)) ToggleNeutral();
             // Taking the car from the cockpit itself: brake held, neutral, throttle released, then press START.
             bool starter = connected && Raw.starter;
@@ -144,7 +145,7 @@ namespace SimRacing
             s.gear = 0;
         }
         public void Hold() { Held = true; StartRequested = false; }
-        /// <summary>Automatic gearbox: taking the car over (F9 or START), or F9 while driving, also cranks the
+        /// <summary>Automatic gearbox: taking the car over (brake held, or START), also cranks the
         /// engine, so the driver only has to put the lever in gear. Consumed by the car once the countdown ends.</summary>
         public bool StartRequested { get; private set; }
         public bool ConsumeStart() { bool s = StartRequested; StartRequested = false; return s; }
@@ -164,7 +165,7 @@ namespace SimRacing
             s.throttle = Rest(smoothThrottle); s.brake = Rest(smoothBrake); s.clutch = Rest(smoothClutch);
         }
         static float Rest(float x) => x < PedalRest ? 0 : x > 1 - PedalRest ? 1 : (x - PedalRest) / (1 - 2 * PedalRest);
-        /// <summary>F9: hand the car to the cockpit when it is in a safe state.</summary>
+        /// <summary>Hand the car to the cockpit when it is in a safe state (used by tests and the takeover logic).</summary>
         public bool Resume() => TakeOver(false);
         bool TakeOver(bool fromStarter)
         {
@@ -186,8 +187,8 @@ namespace SimRacing
                 if (r.throttle > .05f) need.Add($"nhả ga (đang {r.throttle * 100:0}%)");
                 if (r.brake < .5f) need.Add($"đạp phanh quá nửa (đang {r.brake * 100:0}%)");
                 if (VehicleSpeed() > 1) need.Add("dừng hẳn xe");
-                if (need.Count == 0) return "Sẵn sàng · bật khóa điện rồi nhấn nút ĐỀ (Start) trên buồng lái, hoặc F9";
-                return string.Join(" · ", need) + " → rồi nhấn ĐỀ/F9.  % sai thì vào THIẾT LẬP › Hiệu chỉnh bàn đạp";
+                if (need.Count == 0) return "Sẵn sàng · đang nhận xe…";
+                return string.Join(" · ", need) + " → xe tự nhận khi đủ điều kiện.  % sai thì vào THIẾT LẬP › Hiệu chỉnh bàn đạp";
             }
         }
         public void SetPaused(bool paused) { Paused = paused; Hold(); SendFeedback(0, 0, 0, 0, 0, false, false, 0); }

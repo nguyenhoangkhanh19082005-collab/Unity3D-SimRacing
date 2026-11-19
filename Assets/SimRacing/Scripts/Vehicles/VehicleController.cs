@@ -206,7 +206,9 @@ namespace SimRacing
                     if (input.starter && (Fuel <= 0 || Wrecked)) Sound?.TriggerMotorNoStart();
                     else if (input.starter && !input.ignition && !holding) ShowHint("Bật KHÓA ĐIỆN (Ignition) trước rồi mới nhấn ĐỀ");
                 }
-                else if (!EngineRunning && (input.starter || (Automatic && rig.ConsumeStart())))
+                // The engine also cranks by itself with the ignition on and the brake held: the START signal from
+                // the control box does not reach the game on the current rig.
+                else if (!EngineRunning && (input.starter || (Automatic && rig.ConsumeStart()) || input.brake >= .5f))
                 {
                     // Like a real manual car: crank only in neutral or with the clutch pressed.
                     if (manualClutch && Gear != 0 && input.clutch < .6f) ShowHint("Đạp hết CÔN (hoặc phím N về số N) rồi mới đề máy");
@@ -224,8 +226,8 @@ namespace SimRacing
             // Why the car is not moving, while the driver has the car: shown until it is fixed.
             if (!isKeyboardMode && !holding && Hint == "")
             {
-                if (!input.ignition) ShowHint("KHÓA ĐIỆN đang TẮT • bật khóa điện trên buồng lái, rồi nhấn ĐỀ (hoặc F9)", .3f);
-                else if (!EngineRunning && Fuel > 0 && !Wrecked) ShowHint("MÁY CHƯA NỔ • nhấn nút ĐỀ (hoặc F9) để nổ máy", .3f);
+                if (!input.ignition) ShowHint("KHÓA ĐIỆN đang TẮT • bật khóa điện trên buồng lái (máy tự nổ khi đạp phanh)", .3f);
+                else if (!EngineRunning && Fuel > 0 && !Wrecked) ShowHint(manualClutch && Gear != 0 ? "MÁY CHƯA NỔ • đạp phanh + đạp hết côn để nổ máy" : "MÁY CHƯA NỔ • đạp phanh để nổ máy", .3f);
                 else if (EngineRunning && Gear == 0 && input.throttle > .15f) ShowHint(rig.NeutralSelected ? "Đang ở số N (phím N) • nhấn N lần nữa để vào D" : "Đang ở số N • gạt cần vào số 1 (hoặc 2…5 = D)", .3f);
             }
             float ratio=definition.ratios[Mathf.Clamp(Gear,0,definition.ratios.Length-1)];

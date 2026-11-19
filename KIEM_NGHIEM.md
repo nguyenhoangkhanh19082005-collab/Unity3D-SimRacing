@@ -14,9 +14,10 @@ Game tự chạy khoảng 5 phút rồi tự thoát. Mở `SimRacing-Windows/Ver
 | --- | --- |
 | `random weather covers every preset` | 400 lần bốc thăm ra đủ Nắng / Mưa / Sương mù / Đêm |
 | `keyboard mode ignores rig pedals` | Ở chế độ bàn phím, đạp ga trên buồng lái không làm xe chạy |
-| `switching to rig mode waits for F9 takeover` | Đổi sang buồng lái thì xe bị khóa cho tới khi nhận xe (F9 hoặc nút ĐỀ) |
+| `switching to rig mode waits for the brake` | Đổi sang buồng lái thì xe bị khóa cho tới khi đạp phanh (nhả ga) |
+| `pressing the brake takes the car over (no key)` / `brake takes over again after a timeout` | Không có F9: đạp phanh là nhận xe, kể cả sau khi mất kết nối |
 | `settings screen reads the live cockpit` | Màn hình THIẾT LẬP đọc trực tiếp dữ liệu buồng lái (ảnh `01c-settings-cockpit.png`) |
-| `engine off with the ignition off is explained on the HUD` / `automatic: F9 takeover starts the engine` | Nhận xe bằng F9 rồi bật khóa điện là máy tự nổ, không cần nút ĐỀ; khóa điện tắt thì HUD ghi rõ |
+| `engine off with the ignition off is explained on the HUD` / `automatic: takeover starts the engine without START` | Nhận xe rồi bật khóa điện là máy tự nổ, không cần nút ĐỀ; khóa điện tắt thì HUD ghi rõ |
 | `automatic: lever 1 engages D with the clutch ignored` | Số tự động (mặc định): côn báo đạp hết (như bị keo) mà vẫn vào D |
 | `automatic: car drives off without the clutch` / `gearbox shifts up by itself` | Nổ máy, gạt số 1, đạp ga là chạy, hộp số tự lên số |
 | `automatic: braking to a stop in D does not stall` / `R reverses` | Phanh dừng ở D không chết máy, R lùi được |
@@ -43,7 +44,7 @@ Các bài kiểm tra giao thức chạy khi build (`ProtocolVerification`) còn 
    - W chạy, S phanh rồi lùi, A/D đánh lái. H bật đèn (tắt → cốt → pha). Xe không có gạt mưa.
 2. Đang lái, nhấn **F10**.
    - Hiện thông báo *Đã chuyển sang BUỒNG LÁI*. Xe bị khóa phanh, HUD báo *CHƯA KẾT NỐI BUỒNG LÁI* (nếu ESP32 chưa gửi) hoặc *BUỒNG LÁI TẠM KHÓA* (nếu đã kết nối). Phím W không còn tác dụng.
-3. Với buồng lái thật đã kết nối (xem [HUONG_DAN_BUONG_LAI.md](HUONG_DAN_BUONG_LAI.md)) và firmware fix5 (số tự động, mặc định): bật khóa điện, nhả ga, giữ phanh, nhấn **nút ĐỀ** (hoặc F9), gạt số 1 rồi buông cần, nhả phanh, đạp ga và chạy. Côn không có tác dụng.
+3. Với buồng lái thật đã kết nối (xem [HUONG_DAN_BUONG_LAI.md](HUONG_DAN_BUONG_LAI.md)) và firmware fix5 (số tự động, mặc định): bật khóa điện, nhả ga, đạp phanh (xe tự nhận và tự nổ máy), gạt số 1 rồi buông cần, nhả phanh, đạp ga và chạy. Côn không có tác dụng.
    - Buông cần số sau khi gạt: HUD vẫn ghi `D1`, tự lên `D2`, `D3`… khi tăng tốc. Phím **N** bật/tắt số N.
    - Vô lăng, bàn đạp, cần số điều khiển xe. Dòng dưới HUD hiện số, % ga/phanh, chữ SỐ TỰ ĐỘNG và % lái trực tiếp.
    - Phanh dừng xe ở D: không chết máy. Gạt R khi xe còn chạy tới: HUD báo phải dừng hẳn.
