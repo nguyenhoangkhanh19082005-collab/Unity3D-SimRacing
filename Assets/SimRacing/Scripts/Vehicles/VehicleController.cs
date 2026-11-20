@@ -237,9 +237,11 @@ namespace SimRacing
             if(manualClutch && EngineRunning && !holding && Gear!=0 && engagement>.85f && Speed<2.5f
                && (input.brake>.25f || (Gear>=3 && Gear<=5 && input.throttle<.5f))) stallClock+=dt; else stallClock=0;
             if(stallClock>.7f) { EngineRunning=false; stallClock=0; ShowHint("CHẾT MÁY • Đạp hết côn (hoặc phím N) rồi nhấn ĐỀ để nổ máy lại", 4); }
-            // Idle creep: in 1st or reverse with the clutch up and no brake, an idling engine moves the car slowly.
+            // Idle creep: in 1st/D or reverse with the clutch up and no brake, an idling engine moves the car slowly.
+            // The push fades out towards CreepKmh so the car settles at walking pace instead of surging to 6 km/h.
             float drive=input.throttle;
-            if(!isKeyboardMode && EngineRunning && (Gear==1 || Gear==6) && Speed<6 && input.brake<.1f) drive=Mathf.Max(drive,.1f);
+            if(!isKeyboardMode && EngineRunning && (Gear==1 || Gear==6) && Speed<CreepKmh && input.brake<.1f)
+                drive=Mathf.Max(drive,CreepDrive*Mathf.Clamp01((CreepKmh-Speed)/CreepKmh));
             float shaft=Mathf.Abs(forwardSpeed)/(2*Mathf.PI*definition.tireRadius)*60*Mathf.Abs(ratio)*definition.finalDrive;
             float throttleRPM=Mathf.Lerp(definition.idleRPM,definition.redlineRPM,input.throttle);
             float targetRPM=Gear==0 || engagement<.15f ? throttleRPM : Mathf.Max(Mathf.Lerp(definition.idleRPM,throttleRPM,0.35f),shaft);
@@ -295,6 +297,7 @@ namespace SimRacing
         public bool Automatic { get; private set; }
         /// <summary>Automatic gearbox for the cockpit (clutch pedal unused): any forward lever position is D and
         /// the gear follows the road speed like the keyboard mode; R only engages once the car has stopped.</summary>
+        const float CreepKmh = 3f, CreepDrive = .05f;
         int AutomaticCockpit(int lever, float forwardSpeed)
         {
             if (lever == 0) { engagedGear = 0; return 0; }

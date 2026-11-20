@@ -126,12 +126,13 @@ namespace SimRacing
         {
             if (!NeutralSelected) { SelectNeutral(); return; }
             neutralSwitch = 0;
-            var r = Raw; if (!r.gearFault) r.gear = calibration.Gear(r.switchGear); Raw = r;
+            var r = Raw; if (!r.gearFault) r.gear = calibration.DriveGear(r.switchGear); Raw = r;
         }
         public void SelectNeutral()
         {
-            if (Raw.switchGear == 0 || Raw.gearFault) return;
-            neutralSwitch = Raw.switchGear;
+            // Stored as switch + 1 so that "no switch reported" (automatic: D) can also be put in N.
+            if (Raw.gearFault || (Raw.switchGear == 0 && !Raw.automatic)) return;
+            neutralSwitch = Raw.switchGear + 1;
             neutralClutchReleased = Raw.clutch < .3f;
             var r = Raw; ApplyNeutral(ref r); Raw = r;
         }
@@ -139,7 +140,7 @@ namespace SimRacing
         {
             if (neutralSwitch == 0) return;
             if (s.gearFault) return; // Lever crossing between switches: already reported as N.
-            if (s.switchGear != neutralSwitch) { neutralSwitch = 0; return; }
+            if (s.switchGear + 1 != neutralSwitch) { neutralSwitch = 0; return; }
             if (s.clutch < .3f) neutralClutchReleased = true;
             else if (s.clutch >= RigSample.ClutchIn && neutralClutchReleased) { neutralSwitch = 0; return; }
             s.gear = 0;
@@ -156,9 +157,23 @@ namespace SimRacing
         // a released pedal at exactly 0% (so takeover is not refused) without making the pedals feel slow.
         float smoothThrottle, smoothBrake, smoothClutch;
         const float PedalTau = .04f, PedalRest = .03f;
+        // Rest floor: on the rig the released brake reads 12-21% (and drifts), which held the car with a
+        // permanent brake. The lowest reading seen is taken as "released" (capped at 35%, so a pedal held at
+        // connection still reaches the takeover threshold) and follows a drifting rest slowly upwards.
+        float floorThrottle = -1, floorBrake = -1;
+        const float FloorCap = .35f, FloorBand = .08f, FloorTau = 2f;
+        static float Floor(ref float floor, float x, double dt)
+        {
+            if (floor < 0 || x < floor) floor = Mathf.Min(x, FloorCap);
+            else if (x < floor + FloorBand && dt > 0) floor += (x - floor) * Mathf.Min(1, (float)dt / FloorTau);
+            return Mathf.Clamp01((x - floor) / (1 - floor));
+        }
         void SmoothPedals(ref RigSample s, double dt)
         {
             float a = dt < 0 ? 1 : 1 - Mathf.Exp(-(float)dt / PedalTau);
+            if (dt < 0) floorThrottle = floorBrake = -1; // New connection: learn the rest again.
+            s.throttle = Floor(ref floorThrottle, s.throttle, dt);
+            s.brake = Floor(ref floorBrake, s.brake, dt);
             smoothThrottle += (s.throttle - smoothThrottle) * a;
             smoothBrake += (s.brake - smoothBrake) * a;
             smoothClutch += (s.clutch - smoothClutch) * a;

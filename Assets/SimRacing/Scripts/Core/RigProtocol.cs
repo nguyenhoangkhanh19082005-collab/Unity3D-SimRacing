@@ -43,6 +43,10 @@ namespace SimRacing
             return true;
         }
         public int Gear(int switchGear) => switchGear >= 0 && switchGear < 7 && GearMapValid(gearMap) ? gearMap[switchGear] : 0;
+        /// <summary>Gear the car uses for this firmware switch. In automatic, "no gear switch reported" (0) means D:
+        /// on the rig the shifter switches may never reach the MCP23017 (the firmware then reports 0 for ever) and the
+        /// car would sit in N revving. Neutral in automatic is key N; R still needs the lever.</summary>
+        public int DriveGear(int switchGear) => !useClutchPedal && switchGear == 0 ? 1 : Gear(switchGear);
         /// <summary>Encoder ticks to steering -1 (left) .. +1 (right). The firmware counts positive ticks
         /// when the wheel turns LEFT, so positive ticks steer left unless invertSteering is set.</summary>
         public float SteeringFromTicks(int ticks) => Steering(-(ticks - steeringCenterTicks) / steeringHalfRangeTicks);
@@ -121,7 +125,7 @@ namespace SimRacing
             // Automatic mode: the clutch pedal (glued in place on the current rig) never reaches the car.
             s.automatic = !c.useClutchPedal;
             s.clutch = s.automatic ? 0 : c.Clutch(s.clutchADC);
-            s.switchGear = b[18]; s.gear = c.Gear(s.switchGear); int mask = U16(b, 19); s.buttons = mask;
+            s.switchGear = b[18]; s.gear = c.DriveGear(s.switchGear); int mask = U16(b, 19); s.buttons = mask;
             s.ignition = (mask & 1) != 0; s.starter = (mask & 2) != 0; s.hazard = (mask & 4) != 0;
             s.headlights = (mask & 16) != 0 ? 2 : (mask & 8) != 0 ? 1 : 0;
             // Mask bits 32/64 (wiper switch) stay reserved in the packet format but are ignored: the game has no wipers.

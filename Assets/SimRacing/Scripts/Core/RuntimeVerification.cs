@@ -66,6 +66,24 @@ namespace SimRacing
             gear=6;yield return new WaitForSecondsRealtime(.3f);brake=0;throttle=1500;yield return new WaitForSecondsRealtime(1.5f);
             Check(app.Car.Gear==6 && Vector3.Dot(app.Car.Body.linearVelocity,app.Car.transform.forward)<-.5f,"automatic: R reverses");
             throttle=0;brake=4095;gear=0;yield return new WaitForSecondsRealtime(3);
+            // The rig as measured on 2026-11-19: the shifter switches never reach the firmware (gear stays 0) and the
+            // released brake reads ~20%. Automatic must still drive: gear 0 = D, and the brake rest is learned as 0%.
+            sending=false;yield return new WaitForSecondsRealtime(.6f);
+            brake=850;throttle=0;flags=1;sending=true;yield return new WaitForSecondsRealtime(.4f);
+            Check(app.Rig.Connected && app.Rig.Raw.brake<.02f,"released brake resting at 20% reads 0% ("+(app.Rig.Raw.brake*100).ToString("0")+"%)");
+            brake=4095;yield return new WaitForSecondsRealtime(1.2f);
+            Check(!app.Rig.Held && app.Rig.Raw.brake>.95f,"brake still reaches 100% and takes the car over");
+            Check(app.Car.Gear==1 && app.Car.EngineRunning,"automatic: no gear switch reported = D, engine running");
+            Vector3 dOrigin=app.Car.transform.position;brake=850;throttle=4095;yield return new WaitForSecondsRealtime(2);yield return Capture("04d-gear0-drive.png");yield return new WaitForSecondsRealtime(2);
+            Check(app.Car.Speed>15 && Vector3.Distance(dOrigin,app.Car.transform.position)>8,"automatic: drives off with gear 0 and a 20% brake rest ("+app.Car.Speed.ToString("0")+" km/h, held="+app.Rig.Held+" thr="+app.Rig.Raw.throttle.ToString("0.00")+" brk="+app.Rig.Raw.brake.ToString("0.00")+" gear="+app.Car.Gear+" rpm="+app.Car.RPM.ToString("0")+" d="+Vector3.Distance(dOrigin,app.Car.transform.position).ToString("0.0")+" fwd="+Vector3.Dot(app.Car.Body.linearVelocity,app.Car.transform.forward).ToString("0.0")+" hint="+app.Car.Hint+" ctl="+app.Car.Controls.throttle.ToString("0.00")+"/"+app.Car.Controls.brake.ToString("0.00")+")");
+            throttle=0;brake=4095;yield return new WaitForSecondsRealtime(4);
+            app.Rig.ToggleNeutral();yield return new WaitForSecondsRealtime(.2f);bool nOn=app.Car.Gear==0;
+            app.Rig.ToggleNeutral();yield return new WaitForSecondsRealtime(.2f);
+            Check(nOn && app.Car.Gear==1,"key N toggles N / D when no gear switch is reported");
+            // Idle creep in D: walking pace, not a surge
+            brake=850;yield return new WaitForSecondsRealtime(4);float creep=app.Car.Speed;
+            Check(creep>.3f && creep<4.5f,"automatic: idle creep in D stays at walking pace ("+creep.ToString("0.0")+" km/h)");
+            brake=4095;yield return new WaitForSecondsRealtime(2);
             // The rest of this drive checks the optional manual gearbox ("Dùng chân côn")
             app.Rig.calibration.useClutchPedal=true;yield return new WaitForSecondsRealtime(.1f);
             // Manual gearbox: moving the lever into 1st with the clutch up is refused (the box stays in N)
